@@ -6,7 +6,7 @@ import (
 	"syscall"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
+	fiberLogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/yourname/ticketing-system/pkg/config"
 	"github.com/yourname/ticketing-system/pkg/logger" // Import our logger pkg
@@ -32,27 +32,27 @@ func main() {
 
 	// 3. Init Fiber
 	app := fiber.New(fiber.Config{
-		AppName: cfg.Server.AppName,
+		AppName: cfg.Server.ServiceName,
 	})
 
 	// 4. Middlewares
 	app.Use(recover.New())
-	app.Use(logger.New())
+	app.Use(fiberLogger.New())
 
 	// 5. Routes
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status": "ok",
-			"app":    cfg.Server.AppName,
+			"app":    cfg.Server.ServiceName,
 		})
 	})
 
 	// 6. Graceful Shutdown
-	// Create a channel to listen for OS signals
+	// Create a channel to listen for Interrupt (Ctrl+C) or SIGTERM (Kubernetes/Docker stop)
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
-	// Run server in a goroutine
+	// Run server in a separate goroutine so it doesn't block the main thread
 	go func() {
 		logger.Log.Info("Server is listening on port " + cfg.Server.Port)
 		if err := app.Listen(cfg.Server.Port); err != nil {
@@ -60,11 +60,11 @@ func main() {
 		}
 	}()
 
-	// Wait for interrupt signal
+	// Block main thread until a signal is received
 	<-quit
 	logger.Log.Info("Graceful shutdown initiated...")
 
-	// Shutdown Fiber app (waits for pending requests)
+	// Shutdown Fiber app (waits for ongoing requests to finish)
 	if err := app.Shutdown(); err != nil {
 		logger.Log.Fatal("Server forced to shutdown", zap.Error(err))
 	}
