@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	_ "github.com/lib/pq" // Driver cho Postgres
+	_ "github.com/lib/pq"
 
 	"github.com/yourname/ticketing-system/internal/adapter/handler"
 	"github.com/yourname/ticketing-system/internal/adapter/repository"
@@ -16,7 +17,7 @@ import (
 )
 
 func main() {
-	// 1. Cấu hình các thông số (Ưu tiên lấy từ biến môi trường)
+	// 1. Lấy biến môi trường
 	dbUser := getEnv("DATABASE_USER", "user")
 	dbPass := getEnv("DATABASE_PASSWORD", "password")
 	dbName := getEnv("DATABASE_DBNAME", "ticket_db")
@@ -30,53 +31,60 @@ func main() {
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		log.Fatalf("Không thể kết nối Database: %v", err)
+		log.Fatalf("Lỗi cấu hình Database: %v", err)
 	}
-	defer db.Close() // Đóng kết nối khi tắt server
+	defer db.Close()
 
-	// Kiểm tra kết nối thực tế
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Database không phản hồi: %v", err)
+	// Cơ chế Retry: Đợi Database sẵn sàng (Hữu ích khi chạy Docker)
+	for i := 0; i < 5; i++ {
+		err = db.Ping()
+		if err == nil {
+			break
+		}
+		log.Printf("Đang đợi Database... (Thử lại %d/5)", i+1)
+		time.Sleep(2 * time.Second)
 	}
 
-	// 3. Khởi tạo các lớp (Dependency Injection)
+	if err != nil {
+		log.Fatalf("Database không phản hồi sau nhiều lần thử: %v", err)
+	}
+	log.Println("Kết nối Database thành công!")
+
+	// 3. Khởi tạo Dependency Injection
 	userRepo := repository.NewUserRepository(db)
 	authSvc := service.NewAuthService(userRepo, jwtSecret)
 	authHandler := handler.NewAuthHandler(authSvc)
 
-	// 4. Khởi tạo Fiber App
-	app := fiber.New()
+	// 4. Fiber App
+	app := fiber.New(fiber.Config{
+		AppName: "Ticketing System v1.0",
+	})
 
-	// Thêm logger để theo dõi các request trên terminal
 	app.Use(logger.New())
 
-	// 5. Định nghĩa Routes
+	// 5. Routes
 	api := app.Group("/api/v1")
 
-	// --- Routes Công Khai ---
-	authRoutes := api.Group("/auth")
-	authRoutes.Post("/register", authHandler.Register)
-	authRoutes.Post("/login", authHandler.Login)
+	// Public
+	auth := api.Group("/auth")
+	auth.Post("/register", authHandler.Register)
+	auth.Post("/login", authHandler.Login)
 
-	// --- Routes Bảo Mật (Cần Token) ---
+	// Private
 	userRoutes := api.Group("/user", handler.AuthMiddleware(jwtSecret))
-
 	userRoutes.Get("/me", func(c *fiber.Ctx) error {
-		userID := c.Locals("user_id")
-		role := c.Locals("role")
-
 		return c.JSON(fiber.Map{
 			"status": "success",
 			"data": fiber.Map{
-				"user_id": userID,
-				"role":    role,
-				"message": "Đây là khu vực riêng tư!",
+				"user_id": c.Locals("user_id"),
+				"role":    c.Locals("role"),
 			},
 		})
 	})
 
+	// 6. Chạy Server
 	port := getEnv("SERVER_PORT", "8080")
-	fmt.Printf(port)
+	log.Printf("Server đang chạy tại cổng %s", port)
 	log.Fatal(app.Listen(":" + port))
 }
 
