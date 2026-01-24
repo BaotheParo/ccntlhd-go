@@ -9,7 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // Driver kết nối Postgres
 
 	"github.com/yourname/ticketing-system/internal/adapter/handler"
 	"github.com/yourname/ticketing-system/internal/adapter/repository"
@@ -17,74 +17,55 @@ import (
 )
 
 func main() {
-	// 1. Lấy biến môi trường
-	dbUser := getEnv("DATABASE_USER", "user")
-	dbPass := getEnv("DATABASE_PASSWORD", "password")
-	dbName := getEnv("DATABASE_DBNAME", "ticket_db")
-	dbHost := getEnv("DATABASE_HOST", "localhost")
-	dbPort := getEnv("DATABASE_PORT", "5432")
-	jwtSecret := getEnv("JWT_SECRET", "my-super-secret-key-123")
+	// 1. Cấu hình (Lấy từ Environment hoặc mặc định)
+	jwtSecret := getEnv("JWT_SECRET", "my-super-secret-key-2026")
+	dbConnStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		getEnv("DB_HOST", "localhost"),
+		getEnv("DB_PORT", "5432"),
+		getEnv("DB_USER", "user"),
+		getEnv("DB_PASS", "password"),
+		getEnv("DB_NAME", "ticket_db"),
+	)
 
 	// 2. Kết nối Database
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		dbHost, dbPort, dbUser, dbPass, dbName)
-
-	db, err := sql.Open("postgres", connStr)
+	db, err := sql.Open("postgres", dbConnStr)
 	if err != nil {
-		log.Fatalf("Lỗi cấu hình Database: %v", err)
+		log.Fatalf("Lỗi cấu hình DB: %v", err)
 	}
 	defer db.Close()
 
-	// Cơ chế Retry: Đợi Database sẵn sàng (Hữu ích khi chạy Docker)
+	// Chờ DB sẵn sàng (Retry logic)
 	for i := 0; i < 5; i++ {
-		err = db.Ping()
-		if err == nil {
+		if err = db.Ping(); err == nil {
 			break
 		}
-		log.Printf("Đang đợi Database... (Thử lại %d/5)", i+1)
+		log.Printf("Đang đợi DB... (%d/5)", i+1)
 		time.Sleep(2 * time.Second)
 	}
-
 	if err != nil {
-		log.Fatalf("Database không phản hồi sau nhiều lần thử: %v", err)
+		log.Fatal("Không thể kết nối Database!")
 	}
-	log.Println("Kết nối Database thành công!")
 
-	// 3. Khởi tạo Dependency Injection
+	// 3. Khởi tạo các lớp (Dependency Injection)
+	// Thứ tự: DB -> Repository -> Service -> Handler
 	userRepo := repository.NewUserRepository(db)
-	authSvc := service.NewAuthService(userRepo, jwtSecret)
-	authHandler := handler.NewAuthHandler(authSvc)
+	authService := service.NewAuthService(userRepo, jwtSecret)
+	authHandler := handler.NewAuthHandler(authService)
 
-	// 4. Fiber App
+	// 4. Khởi tạo Fiber
 	app := fiber.New(fiber.Config{
-		AppName: "Ticketing System v1.0",
+		AppName: "Ticketing System v1",
 	})
 
+	// Middleware ghi log để bạn theo dõi trên Terminal khi Postman gọi tới
 	app.Use(logger.New())
 
-	// 5. Routes
-	api := app.Group("/api/v1")
-
-	// Public
-	auth := api.Group("/auth")
-	auth.Post("/register", authHandler.Register)
-	auth.Post("/login", authHandler.Login)
-
-	// Private
-	userRoutes := api.Group("/user", handler.AuthMiddleware(jwtSecret))
-	userRoutes.Get("/me", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status": "success",
-			"data": fiber.Map{
-				"user_id": c.Locals("user_id"),
-				"role":    c.Locals("role"),
-			},
-		})
-	})
+	// 5. GỌI ROUTER CỦA BẠN Ở ĐÂY
+	handler.SetupRoutes(app, authHandler, jwtSecret)
 
 	// 6. Chạy Server
 	port := getEnv("SERVER_PORT", "8080")
-	log.Printf("Server đang chạy tại cổng %s", port)
+	log.Printf("🚀 Server đang chạy tại: http://localhost:%s", port)
 	log.Fatal(app.Listen(":" + port))
 }
 
