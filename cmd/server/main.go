@@ -1,73 +1,88 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
+	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/gofiber/fiber/v2"
-	fiberLogger "github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/yourname/ticketing-system/pkg/config"
-	"github.com/yourname/ticketing-system/pkg/logger" // Import our logger pkg
-	"go.uber.org/zap"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	_ "github.com/lib/pq" // Driver cho Postgres
+
+	"github.com/yourname/ticketing-system/internal/adapter/handler"
+	"github.com/yourname/ticketing-system/internal/adapter/repository"
+	"github.com/yourname/ticketing-system/internal/core/service"
 )
 
 func main() {
-	// 1. Load Config
-	cfg, err := config.LoadConfig()
+	// 1. Cấu hình các thông số (Ưu tiên lấy từ biến môi trường)
+	dbUser := getEnv("DATABASE_USER", "user")
+	dbPass := getEnv("DATABASE_PASSWORD", "password")
+	dbName := getEnv("DATABASE_DBNAME", "ticket_db")
+	dbHost := getEnv("DATABASE_HOST", "localhost")
+	dbPort := getEnv("DATABASE_PORT", "5432")
+	jwtSecret := getEnv("JWT_SECRET", "my-super-secret-key-123")
+
+	// 2. Kết nối Database
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		dbHost, dbPort, dbUser, dbPass, dbName)
+
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		// If config fails, we might not have a logger yet, use panic or fmt
-		panic(err)
+		log.Fatalf("Không thể kết nối Database: %v", err)
+	}
+	defer db.Close() // Đóng kết nối khi tắt server
+
+	// Kiểm tra kết nối thực tế
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Database không phản hồi: %v", err)
 	}
 
-	// 2. Init Logger
-	if err := logger.InitLogger(cfg.Server.Env); err != nil {
-		panic(err)
-	}
-	// Verify logger works (flush buffered logs at the end)
-	defer logger.Log.Sync()
+	// 3. Khởi tạo các lớp (Dependency Injection)
+	userRepo := repository.NewUserRepository(db)
+	authSvc := service.NewAuthService(userRepo, jwtSecret)
+	authHandler := handler.NewAuthHandler(authSvc)
 
-	logger.Log.Info("Starting Ticketing System...", zap.String("env", cfg.Server.Env))
+	// 4. Khởi tạo Fiber App
+	app := fiber.New()
 
-	// 3. Init Fiber
-	app := fiber.New(fiber.Config{
-		AppName: cfg.Server.ServiceName,
-	})
+	// Thêm logger để theo dõi các request trên terminal
+	app.Use(logger.New())
 
-	// 4. Middlewares
-	app.Use(recover.New())
-	app.Use(fiberLogger.New())
+	// 5. Định nghĩa Routes
+	api := app.Group("/api/v1")
 
-	// 5. Routes
-	app.Get("/health", func(c *fiber.Ctx) error {
+	// --- Routes Công Khai ---
+	authRoutes := api.Group("/auth")
+	authRoutes.Post("/register", authHandler.Register)
+	authRoutes.Post("/login", authHandler.Login)
+
+	// --- Routes Bảo Mật (Cần Token) ---
+	userRoutes := api.Group("/user", handler.AuthMiddleware(jwtSecret))
+
+	userRoutes.Get("/me", func(c *fiber.Ctx) error {
+		userID := c.Locals("user_id")
+		role := c.Locals("role")
+
 		return c.JSON(fiber.Map{
-			"status": "ok",
-			"app":    cfg.Server.ServiceName,
+			"status": "success",
+			"data": fiber.Map{
+				"user_id": userID,
+				"role":    role,
+				"message": "Đây là khu vực riêng tư!",
+			},
 		})
 	})
 
-	// 6. Graceful Shutdown
-	// Create a channel to listen for Interrupt (Ctrl+C) or SIGTERM (Kubernetes/Docker stop)
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	port := getEnv("SERVER_PORT", "8080")
+	fmt.Printf(port)
+	log.Fatal(app.Listen(":" + port))
+}
 
-	// Run server in a separate goroutine so it doesn't block the main thread
-	go func() {
-		logger.Log.Info("Server is listening on port " + cfg.Server.Port)
-		if err := app.Listen(cfg.Server.Port); err != nil {
-			logger.Log.Fatal("Server failed to start", zap.Error(err))
-		}
-	}()
-
-	// Block main thread until a signal is received
-	<-quit
-	logger.Log.Info("Graceful shutdown initiated...")
-
-	// Shutdown Fiber app (waits for ongoing requests to finish)
-	if err := app.Shutdown(); err != nil {
-		logger.Log.Fatal("Server forced to shutdown", zap.Error(err))
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
 	}
-
-	logger.Log.Info("Server exited successfully")
+	return fallback
 }
