@@ -20,11 +20,11 @@ func main() {
 	// 1. Cấu hình (Lấy từ Environment hoặc mặc định)
 	jwtSecret := getEnv("JWT_SECRET", "my-super-secret-key-2026")
 	dbConnStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		getEnv("DB_HOST", "localhost"),
-		getEnv("DB_PORT", "5432"),
-		getEnv("DB_USER", "user"),
-		getEnv("DB_PASS", "password"),
-		getEnv("DB_NAME", "ticket_db"),
+		getEnv("DATABASE_HOST", "postgres"),
+		getEnv("DATABASE_PORT", "5432"),
+		getEnv("DATABASE_USER", "user"),
+		getEnv("DATABASE_PASSWORD", "password"),
+		getEnv("DATABASE_DBNAME", "ticket_db"),
 	)
 
 	// 2. Kết nối Database
