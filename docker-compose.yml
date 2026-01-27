@@ -28,17 +28,19 @@ services:
       - postgres
       - redis
     environment:
-      - SERVER_PORT=:8080
+      - SERVER_PORT=8080
       - SERVER_ENV=prod
       # Database Config
-      - DATABASE_HOST=postgres
-      - DATABASE_PORT=5432
-      - DATABASE_USER=user
-      - DATABASE_PASSWORD=password
-      - DATABASE_DBNAME=ticket_db
-      - DATABASE_SSLMODE=disable
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=user
+      - DB_PASS=password
+      - DB_NAME=ticket_db
+      - DB_SSLMODE=disable
       # Redis Config
       - REDIS_ADDR=redis:6379
 
 volumes:
   postgres_data:
+
+
