@@ -46,3 +46,21 @@ func AuthMiddleware(secret string) fiber.Handler {
 		return c.Next()
 	}
 }
+
+// AdminMiddleware kiểm tra user có role admin không (phải chạy sau AuthMiddleware)
+func AdminMiddleware(c *fiber.Ctx) error {
+	role := c.Locals("role")
+	if role == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Yêu cầu xác thực trước",
+		})
+	}
+
+	if role != "admin" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Chỉ admin mới có quyền thực hiện thao tác này",
+		})
+	}
+
+	return c.Next()
+}

@@ -98,7 +98,7 @@ CREATE INDEX idx_orders_status ON orders(status);
 CREATE INDEX idx_ticket_types_event_id ON ticket_types(event_id);
 
 INSERT INTO users (username, email, password_hash, role) 
-VALUES ('admin', 'admin@example.com', '$2a$10$NotRealHashButExample', 'admin');
+VALUES ('admin', 'admin@example.com', '$2a$10$WGkl8JLxQSRPXfnM8qxQi.XAJ4kX4p7N5nN5nN5nN5nN5nN5nN5nK', 'admin');
 
 WITH new_event AS (
     INSERT INTO events (name, slug, location, start_time, end_time, status)
