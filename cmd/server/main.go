@@ -58,6 +58,11 @@ func main() {
 	eventService := service.NewEventService(eventRepo)
 	eventHandler := handler.NewEventHandler(eventService)
 
+	// Order module
+	orderRepo := repository.NewOrderRepository(db)
+	orderService := service.NewOrderService(db, orderRepo)
+	orderHandler := handler.NewOrderHandler(orderService)
+
 	// 4. Khởi tạo Fiber
 	app := fiber.New(fiber.Config{
 		AppName: "Ticketing System v1",
@@ -67,7 +72,7 @@ func main() {
 	app.Use(logger.New())
 
 	// 5. GỌI ROUTER CỦA BẠN Ở ĐÂY
-	handler.SetupRoutes(app, authHandler, eventHandler, jwtSecret)
+	handler.SetupRoutes(app, authHandler, eventHandler, orderHandler, jwtSecret)
 
 	// 6. Chạy Server
 	port := getEnv("SERVER_PORT", "8080")

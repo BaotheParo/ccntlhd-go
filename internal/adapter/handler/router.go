@@ -5,7 +5,7 @@ import (
 )
 
 // SetupRoutes tập trung tất cả định nghĩa API vào một chỗ
-func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHandler, jwtSecret string) {
+func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHandler, orderHandler *OrderHandler, jwtSecret string) {
 	api := app.Group("/api/v1")
 
 	// Auth routes
@@ -28,4 +28,8 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 	events.Get("/:id", eventHandler.GetEvent)                                              // Get event by ID
 	events.Get("/slug/:slug", eventHandler.GetEventBySlug)                                 // Get event by slug
 	events.Get("", eventHandler.ListEvents)                                                // List all events
+
+	// Order routes
+	orders := api.Group("/orders", AuthMiddleware(jwtSecret))
+	orders.Post("/", orderHandler.PlaceOrder)
 }
