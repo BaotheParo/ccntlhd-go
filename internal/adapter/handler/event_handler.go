@@ -16,7 +16,6 @@ func NewEventHandler(svc port.EventServicePort) *EventHandler {
 }
 
 func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
-	// Middleware đã check JWT + admin role, nên request vào đây đã valid
 	var req entity.CreateEventRequest
 
 	if err := c.BodyParser(&req); err != nil {
@@ -25,18 +24,12 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 		})
 	}
 
-	// Lấy user_id từ JWT token (được set bởi middleware)
-	userID := c.Locals("user_id")
-
 	event, err := h.svc.CreateEvent(c.Context(), req)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}
-
-	// Log who created the event
-	c.Set("X-Created-By", userID.(string))
 
 	return c.Status(fiber.StatusCreated).JSON(event)
 }

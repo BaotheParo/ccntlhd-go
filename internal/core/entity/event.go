@@ -46,3 +46,9 @@ type CreateEventRequest struct {
 	StartTime time.Time `json:"start_time" validate:"required"`
 	EndTime   time.Time `json:"end_time" validate:"required"`
 }
+
+type CreateTicketTypeRequest struct {
+	Name            string          `json:"name" validate:"required,min=3"`
+	Price           decimal.Decimal `json:"price" validate:"required"`
+	InitialQuantity int             `json:"initial_quantity" validate:"required,min=1"`
+}

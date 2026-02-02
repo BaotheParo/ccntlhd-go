@@ -52,3 +52,11 @@ func (r *eventRepository) UpdateEvent(ctx context.Context, event *entity.Event) 
 func (r *eventRepository) DeleteEvent(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Delete(&entity.Event{}, "id = ?", id).Error
 }
+
+func (r *eventRepository) CreateTicketType(ctx context.Context, ticketType *entity.TicketType) error {
+	return r.db.WithContext(ctx).Create(ticketType).Error
+}
+
+func (r *eventRepository) CreateTicketTypes(ctx context.Context, ticketTypes []entity.TicketType) error {
+	return r.db.WithContext(ctx).Create(ticketTypes).Error
+}

@@ -46,9 +46,45 @@ func (s *eventService) CreateEvent(ctx context.Context, req entity.CreateEventRe
 		UpdatedAt: time.Now(),
 	}
 
-	// Save to database
+	// Save event to database
 	if err := s.eventRepo.CreateEvent(ctx, event); err != nil {
 		return nil, err
+	}
+
+	return event, nil
+}
+
+// CreateEventWithTickets tạo event + ticket types (dùng cho test)
+func (s *eventService) CreateEventWithTickets(ctx context.Context, eventReq entity.CreateEventRequest, ticketTypes []entity.CreateTicketTypeRequest) (*entity.Event, error) {
+	// Tạo event trước
+	event, err := s.CreateEvent(ctx, eventReq)
+	if err != nil {
+		return nil, err
+	}
+
+	// Sau đó tạo ticket types
+	if len(ticketTypes) > 0 {
+		tickets := make([]entity.TicketType, 0, len(ticketTypes))
+		for _, tt := range ticketTypes {
+			if err := validateCreateTicketTypeRequest(tt); err != nil {
+				return nil, err
+			}
+
+			ticketType := entity.TicketType{
+				ID:                uuid.New(),
+				EventID:           event.ID,
+				Name:              tt.Name,
+				Price:             tt.Price,
+				InitialQuantity:   tt.InitialQuantity,
+				RemainingQuantity: tt.InitialQuantity,
+			}
+			tickets = append(tickets, ticketType)
+		}
+
+		// Save all ticket types
+		if err := s.eventRepo.CreateTicketTypes(ctx, tickets); err != nil {
+			return nil, err
+		}
 	}
 
 	return event, nil
@@ -93,6 +129,19 @@ func validateCreateEventRequest(req entity.CreateEventRequest) error {
 	}
 	if req.EndTime.Before(req.StartTime) {
 		return errors.New("thời gian kết thúc phải sau thời gian bắt đầu")
+	}
+	return nil
+}
+
+func validateCreateTicketTypeRequest(req entity.CreateTicketTypeRequest) error {
+	if req.Name == "" {
+		return errors.New("tên loại vé không được để trống")
+	}
+	if req.Price.IsNegative() || req.Price.IsZero() {
+		return errors.New("giá vé phải lớn hơn 0")
+	}
+	if req.InitialQuantity <= 0 {
+		return errors.New("số lượng vé phải lớn hơn 0")
 	}
 	return nil
 }
