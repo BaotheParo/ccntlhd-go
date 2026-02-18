@@ -16,8 +16,12 @@ import (
 // RequestItem là struct đơn giản để nhận input từ client (mobile/web).
 // Ví dụ: {"ticket_type_id": "...", "quantity": 2}
 type RequestItem struct {
-	TicketTypeID uuid.UUID
-	Quantity     int
+	TicketTypeID uuid.UUID `json:"ticket_type_id"`
+	Quantity     int       `json:"quantity"`
+}
+
+type PlaceOrderRequest struct {
+	Items []RequestItem `json:"items"`
 }
 
 type OrderService struct {

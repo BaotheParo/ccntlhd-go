@@ -25,6 +25,15 @@ type CreateOrderRequest struct {
 	} `json:"items"`
 }
 
+// PlaceOrder godoc
+// @Summary Place a new order
+// @Tags Order
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param payload body service.PlaceOrderRequest true "Order Payload"
+// @Success 201 {object} entity.Order
+// @Router /orders [post]
 func (h *OrderHandler) PlaceOrder(c *fiber.Ctx) error {
 	// parse va validate
 	var req CreateOrderRequest

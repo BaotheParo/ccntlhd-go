@@ -2,11 +2,15 @@ package handler
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/swagger"
+	_ "github.com/yourname/ticketing-system/docs"
 )
 
 // SetupRoutes tập trung tất cả định nghĩa API vào một chỗ
 func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHandler, orderHandler *OrderHandler, jwtSecret string) {
 	api := app.Group("/api/v1")
+	// Swagger
+	api.Get("/swagger/*", swagger.HandlerDefault)
 
 	// Auth routes
 	auth := api.Group("/auth")

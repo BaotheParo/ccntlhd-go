@@ -16,6 +16,11 @@ import (
 	"github.com/yourname/ticketing-system/internal/core/service"
 )
 
+// @title Ticketing System API
+// @version 1.0
+// @description API documentation for Flash Sale System
+// @host localhost:8080
+// @BasePath /api/v1
 func main() {
 	// 1. Cấu hình (Lấy từ Environment hoặc mặc định)
 	jwtSecret := getEnv("JWT_SECRET", "my-super-secret-key-2026")

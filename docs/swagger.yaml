@@ -1,0 +1,176 @@
+basePath: /api/v1
+definitions:
+  entity.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  entity.Order:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/entity.OrderItem'
+        type: array
+      status:
+        $ref: '#/definitions/entity.OrderStatus'
+      total_amount:
+        type: number
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  entity.OrderItem:
+    properties:
+      id:
+        type: string
+      order_id:
+        type: string
+      quantity:
+        type: integer
+      ticket_type_id:
+        type: string
+      unit_price:
+        type: number
+    type: object
+  entity.OrderStatus:
+    enum:
+    - PENDING
+    - PAID
+    - CANCELLED
+    type: string
+    x-enum-varnames:
+    - OrderStatusPending
+    - OrderStatusPaid
+    - OrderStatusCancelled
+  entity.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+      username:
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  entity.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      profile_data:
+        additionalProperties: true
+        type: object
+      role:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  service.PlaceOrderRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/service.RequestItem'
+        type: array
+    type: object
+  service.RequestItem:
+    properties:
+      quantity:
+        type: integer
+      ticket_type_id:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API documentation for Flash Sale System
+  title: Ticketing System API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/entity.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns JWT Token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login user
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Register Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/entity.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.User'
+      summary: Register new user
+      tags:
+      - Auth
+  /orders:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/service.PlaceOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Order'
+      security:
+      - BearerAuth: []
+      summary: Place a new order
+      tags:
+      - Order
+swagger: "2.0"

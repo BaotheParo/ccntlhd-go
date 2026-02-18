@@ -14,6 +14,14 @@ func NewAuthHandler(svc port.AuthServicePort) *AuthHandler {
 	return &AuthHandler{svc: svc}
 }
 
+// Register godoc
+// @Summary Register new user
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param payload body entity.RegisterRequest true "Register Payload"
+// @Success 201 {object} entity.User
+// @Router /auth/register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req entity.RegisterRequest
 
@@ -29,6 +37,14 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(user)
 }
 
+// Login godoc
+// @Summary Login user
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param payload body entity.LoginRequest true "Login Payload"
+// @Success 200 {object} map[string]string "Returns JWT Token"
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req entity.LoginRequest
 
