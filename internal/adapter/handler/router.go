@@ -8,6 +8,11 @@ import (
 
 // SetupRoutes tập trung tất cả định nghĩa API vào một chỗ
 func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHandler, orderHandler *OrderHandler, jwtSecret string) {
+	// Health check endpoint
+	app.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"status": "ok"})
+	})
+
 	api := app.Group("/api/v1")
 	// Swagger
 	api.Get("/swagger/*", swagger.HandlerDefault)
@@ -35,5 +40,8 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 
 	// Order routes
 	orders := api.Group("/orders", AuthMiddleware(jwtSecret))
-	orders.Post("/", orderHandler.PlaceOrder)
+	orders.Post("/", orderHandler.PlaceOrder)             // Create order
+	orders.Get("/", orderHandler.GetUserOrders)           // Get user's orders
+	orders.Get("/:id", orderHandler.GetOrder)             // Get order by ID
+	orders.Post("/:id/cancel", orderHandler.CancelOrder)  // Cancel order
 }
