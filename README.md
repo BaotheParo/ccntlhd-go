@@ -57,6 +57,16 @@ Khi chạy Docker, cấu hình được override bằng biến môi trường (E
 -   `DATABASE_HOST` -> `database.host`
 -   `REDIS_ADDR` -> `redis.addr`
 
+## 🗄️ Database GUI (Adminer)
+
+Dành cho Frontend Team và Developer cần xem/chỉnh sửa data nhanh chóng:
+-   **URL**: [http://localhost:8081](http://localhost:8081) (Sau khi chạy bằng Docker)
+-   **System**: `PostgreSQL`
+-   **Server**: `postgres` (Đã được auto-fill)
+-   **Username**: `user`
+-   **Password**: `password`
+-   **Database**: `ticket_db`
+
 ## ❓ Troubleshooting
 
 ### Lỗi: `bind: address already in use`
