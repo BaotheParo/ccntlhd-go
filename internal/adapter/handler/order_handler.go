@@ -1,27 +1,34 @@
 package handler
 
 import (
-	"fmt"
+	"context"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
-	"github.com/yourname/ticketing-system/internal/core/service"
+	"github.com/yourname/ticketing-system/internal/core/entity"
+	"github.com/yourname/ticketing-system/internal/core/port"
 )
 
 type OrderHandler struct {
-	svc *service.OrderService
+	orderService port.OrderServicePort
 }
 
-func NewOrderHandler(svc *service.OrderService) *OrderHandler {
-	return &OrderHandler{svc: svc}
+func NewOrderHandler(orderService port.OrderServicePort) *OrderHandler {
+	return &OrderHandler{
+		orderService: orderService,
+	}
 }
 
 type CreateOrderRequest struct {
 	Items []struct {
 		TicketTypeID string `json:"ticket_type_id"`
 		Quantity     int    `json:"quantity"`
+		UnitPrice    string `json:"unit_price"`
 	} `json:"items"`
 }
 
@@ -31,59 +38,186 @@ type CreateOrderRequest struct {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param payload body service.PlaceOrderRequest true "Order Payload"
+// @Param payload body CreateOrderRequest true "Order Payload"
 // @Success 201 {object} entity.Order
-// @Router /orders [post]
+// @Router /api/v1/orders [post]
 func (h *OrderHandler) PlaceOrder(c *fiber.Ctx) error {
-	// parse va validate
-	var req CreateOrderRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	if len(req.Items) == 0 {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Items cannot be empty"})
-	}
-
-	// Lay UserID tu AuthMiddleware
-	userIDStr, ok := c.Locals("user_id").(string)
-	if !ok {
-		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
-	}
-
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid user ID"})
-	}
-
-	// Du lieu tu client
-	var serviceItems []service.RequestItem
-	for _, item := range req.Items {
-		ticketID, err := uuid.Parse(item.TicketTypeID)
-		if err != nil {
-			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": fmt.Sprintf("Invalid ticket_type_id: %s", item.TicketTypeID),
-			})
-		}
-		if item.Quantity <= 0 {
-			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": fmt.Sprintf("Quantity must be greater than 0 for ticket: %s", item.TicketTypeID),
-			})
-		}
-
-		serviceItems = append(serviceItems, service.RequestItem{
-			TicketTypeID: ticketID,
-			Quantity:     item.Quantity,
+	// Get user_id from JWT middleware
+	userIDStr := c.Locals("user_id")
+	if userIDStr == nil {
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "user_id not found in context",
 		})
 	}
 
-	// goi Service
-	order, err := h.svc.PlaceOrder(c.Context(), userID, serviceItems)
+	userID, err := uuid.Parse(userIDStr.(string))
 	if err != nil {
-		// Goi Service bi loi
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user_id",
+		})
 	}
 
-	// Tra ve response
+	// Parse request body
+	var req CreateOrderRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	// Convert to entity.OrderItem
+	var items []entity.OrderItem
+	for _, item := range req.Items {
+		ticketTypeID, err := uuid.Parse(item.TicketTypeID)
+		if err != nil {
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid ticket_type_id",
+			})
+		}
+
+		unitPrice, err := decimal.NewFromString(item.UnitPrice)
+		if err != nil {
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid unit_price",
+			})
+		}
+
+		items = append(items, entity.OrderItem{
+			TicketTypeID: ticketTypeID,
+			Quantity:     item.Quantity,
+			UnitPrice:    unitPrice,
+		})
+	}
+
+	// Call service
+	order, err := h.orderService.PlaceOrder(ctx, userID, items)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
 	return c.Status(http.StatusCreated).JSON(order)
+}
+
+// GetOrder godoc
+// @Summary Get order by ID
+// @Tags Order
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Order ID"
+// @Success 200 {object} entity.Order
+// @Router /api/v1/orders/{id} [get]
+func (h *OrderHandler) GetOrder(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	idStr := c.Params("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid order id",
+		})
+	}
+
+	order, err := h.orderService.GetOrder(ctx, id)
+	if err != nil {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "order not found",
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(order)
+}
+
+// GetUserOrders godoc
+// @Summary Get user's orders
+// @Tags Order
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param limit query int false "Limit" default(10)
+// @Param offset query int false "Offset" default(0)
+// @Success 200 {array} entity.Order
+// @Router /api/v1/orders [get]
+func (h *OrderHandler) GetUserOrders(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Get user_id from JWT middleware
+	userIDStr := c.Locals("user_id")
+	if userIDStr == nil {
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "user_id not found in context",
+		})
+	}
+
+	userID, err := uuid.Parse(userIDStr.(string))
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user_id",
+		})
+	}
+
+	// Get query params
+	limit := 10
+	offset := 0
+
+	if l := c.Query("limit"); l != "" {
+		if parsedLimit, err := strconv.Atoi(l); err == nil {
+			limit = parsedLimit
+		}
+	}
+
+	if o := c.Query("offset"); o != "" {
+		if parsedOffset, err := strconv.Atoi(o); err == nil {
+			offset = parsedOffset
+		}
+	}
+
+	orders, err := h.orderService.GetUserOrders(ctx, userID, limit, offset)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(orders)
+}
+
+// CancelOrder godoc
+// @Summary Cancel an order
+// @Tags Order
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Order ID"
+// @Success 200 {object} fiber.Map
+// @Router /api/v1/orders/{id}/cancel [post]
+func (h *OrderHandler) CancelOrder(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	idStr := c.Params("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid order id",
+		})
+	}
+
+	err = h.orderService.CancelOrder(ctx, id)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"message": "order cancelled successfully",
+	})
 }

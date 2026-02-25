@@ -2,123 +2,113 @@ package service
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
-	"gorm.io/gorm"
-
-	"github.com/yourname/ticketing-system/internal/adapter/repository"
 	"github.com/yourname/ticketing-system/internal/core/entity"
+	"github.com/yourname/ticketing-system/internal/core/port"
 )
 
-// RequestItem là struct đơn giản để nhận input từ client (mobile/web).
-// Ví dụ: {"ticket_type_id": "...", "quantity": 2}
-type RequestItem struct {
-	TicketTypeID uuid.UUID `json:"ticket_type_id"`
-	Quantity     int       `json:"quantity"`
+type orderService struct {
+	orderRepository port.OrderRepositoryPort
+	eventRepository port.EventRepositoryPort
 }
 
-type PlaceOrderRequest struct {
-	Items []RequestItem `json:"items"`
-}
-
-type OrderService struct {
-	db   *gorm.DB                    // connection DB để bắt đầu transaction
-	repo *repository.OrderRepository // repo để gọi các hàm lock/trừ kho/tạo order
-}
-
-// NewOrderService tạo service mới, inject db và repo vào.
-func NewOrderService(db *gorm.DB, repo *repository.OrderRepository) *OrderService {
-	return &OrderService{
-		db:   db,
-		repo: repo,
+func NewOrderService(
+	orderRepository port.OrderRepositoryPort,
+	eventRepository port.EventRepositoryPort,
+) port.OrderServicePort {
+	return &orderService{
+		orderRepository: orderRepository,
+		eventRepository: eventRepository,
 	}
 }
 
-// PlaceOrder là hàm chính để user đặt vé.
-// Nhận userID và list các loại vé muốn mua (có thể mua nhiều loại cùng lúc).
-// Trả về order vừa tạo nếu thành công, hoặc lỗi nếu fail (hết vé, lỗi DB...).
-func (s *OrderService) PlaceOrder(ctx context.Context, userID uuid.UUID, requestItems []RequestItem) (*entity.Order, error) {
-	// Bắt đầu transaction – mọi thứ từ đây phải thành công hết, không thì rollback sạch
-	tx := s.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return nil, tx.Error
+// PlaceOrder tạo đơn hàng mới
+func (s *orderService) PlaceOrder(ctx context.Context, userID uuid.UUID, items []entity.OrderItem) (*entity.Order, error) {
+	// Validate input
+	if len(items) == 0 {
+		return nil, errors.New("đơn hàng phải có ít nhất một item")
 	}
 
-	// Defer rollback phòng hờ: nếu panic hoặc có lỗi, tự động rollback.
-	// Nếu commit thành công thì rollback này bị ignore (no-op).
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			panic(r) // ném panic lên trên để log lỗi
-		} else if tx.Error != nil {
-			tx.Rollback()
+	// Validate mỗi item
+	totalAmount := decimal.Zero
+	for i, item := range items {
+		if item.TicketTypeID == uuid.Nil {
+			return nil, errors.New("ticket_type_id không được để trống")
 		}
-	}()
-
-	totalAmount := decimal.Zero // tổng tiền, dùng decimal để tránh lỗi float
-	var orderItems []entity.OrderItem
-	orderID := uuid.New() // sinh ID đơn hàng mới
-
-	// Duyệt từng loại vé user muốn mua
-	for _, item := range requestItems {
-		// 1. Khóa vé lại (FOR UPDATE) để check và trừ kho an toàn
-		ticketType, err := s.repo.GetTicketTypeForUpdate(ctx, tx, item.TicketTypeID)
-		if err != nil {
-			tx.Rollback()
-			return nil, err
+		if item.Quantity <= 0 {
+			return nil, errors.New("số lượng vé phải lớn hơn 0")
+		}
+		if item.UnitPrice.IsNegative() || item.UnitPrice.IsZero() {
+			return nil, errors.New("giá vé phải lớn hơn 0")
 		}
 
-		// 2. Check xem còn đủ vé không
-		if ticketType.RemainingQuantity < item.Quantity {
-			tx.Rollback()
-			return nil, fmt.Errorf("hết vé rồi bro! Loại vé: %s chỉ còn %d, bạn mua %d",
-				ticketType.Name, ticketType.RemainingQuantity, item.Quantity)
-		}
-
-		// 3. Tính tiền cho loại vé này và cộng dồn tổng
-		itemTotal := ticketType.Price.Mul(decimal.NewFromInt(int64(item.Quantity)))
+		// Tính tổng tiền
+		itemTotal := item.UnitPrice.Mul(decimal.NewFromInt(int64(item.Quantity)))
 		totalAmount = totalAmount.Add(itemTotal)
 
-		// 4. Trừ kho ngay (remaining_quantity -= quantity)
-		if err := s.repo.DecreaseStock(ctx, tx, item.TicketTypeID, item.Quantity); err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-
-		// 5. Tạo OrderItem (snapshot giá lúc mua, để sau này tính tiền không bị thay đổi)
-		orderItems = append(orderItems, entity.OrderItem{
-			ID:           uuid.New(),
-			OrderID:      orderID,
-			TicketTypeID: item.TicketTypeID,
-			Quantity:     item.Quantity,
-			UnitPrice:    ticketType.Price, // lưu giá lúc mua
-		})
+		items[i].ID = uuid.New()
 	}
 
-	// 6. Tạo entity Order chính
+	// Tạo order
 	order := &entity.Order{
-		ID:          orderID,
+		ID:          uuid.New(),
 		UserID:      userID,
 		TotalAmount: totalAmount,
-		Status:      entity.OrderStatusPending, // chờ thanh toán
+		Status:      entity.OrderStatusPending,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
-		Items:       orderItems, // gắn luôn list items vào order
+		Items:       items,
 	}
 
-	// 7. Lưu order + order_items vào DB (GORM tự handle association)
-	if err := s.repo.CreateOrder(ctx, tx, order); err != nil {
-		tx.Rollback()
+	// Lưu order vào database
+	if err := s.orderRepository.CreateOrder(ctx, order); err != nil {
 		return nil, err
 	}
 
-	// 8. Commit transaction – nếu tới đây thì coi như thành công
-	if err := tx.Commit().Error; err != nil {
-		return nil, err
+	// Lưu order items
+	for _, item := range items {
+		item.OrderID = order.ID
+		if err := s.orderRepository.CreateOrderItem(ctx, &item); err != nil {
+			return nil, err
+		}
 	}
 
 	return order, nil
+}
+
+func (s *orderService) GetOrder(ctx context.Context, id uuid.UUID) (*entity.Order, error) {
+	return s.orderRepository.GetOrderByID(ctx, id)
+}
+
+func (s *orderService) GetUserOrders(ctx context.Context, userID uuid.UUID, limit int, offset int) ([]entity.Order, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return s.orderRepository.GetOrdersByUserID(ctx, userID, limit, offset)
+}
+
+func (s *orderService) CancelOrder(ctx context.Context, id uuid.UUID) error {
+	// Get order first
+	order, err := s.orderRepository.GetOrderByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Only PENDING orders can be cancelled
+	if order.Status != entity.OrderStatusPending {
+		return errors.New("chỉ có thể hủy đơn hàng ở trạng thái PENDING")
+	}
+
+	// Update status
+	return s.orderRepository.UpdateOrderStatus(ctx, id, entity.OrderStatusCancelled)
 }

@@ -65,7 +65,7 @@ func main() {
 
 	// Order module
 	orderRepo := repository.NewOrderRepository(db)
-	orderService := service.NewOrderService(db, orderRepo)
+	orderService := service.NewOrderService(orderRepo, eventRepo)
 	orderHandler := handler.NewOrderHandler(orderService)
 
 	// 4. Khởi tạo Fiber
@@ -76,7 +76,7 @@ func main() {
 	// Middleware ghi log để bạn theo dõi trên Terminal khi Postman gọi tới
 	app.Use(logger.New())
 
-	// 5. GỌI ROUTER CỦA BẠN Ở ĐÂY
+	// 5. GỌI ROUTER Ở ĐÂY
 	handler.SetupRoutes(app, authHandler, eventHandler, orderHandler, jwtSecret)
 
 	// 6. Chạy Server
