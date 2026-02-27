@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/yourname/ticketing-system/internal/core/entity"
@@ -19,6 +20,30 @@ func NewOrderRepository(db *gorm.DB) port.OrderRepositoryPort {
 
 func (r *orderRepository) CreateOrder(ctx context.Context, order *entity.Order) error {
 	return r.db.WithContext(ctx).Create(order).Error
+}
+
+func (r *orderRepository) CreateOrderWithTransaction(ctx context.Context, order *entity.Order, items []entity.OrderItem) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. Tạo order
+		if err := tx.Create(order).Error; err != nil {
+			return err
+		}
+
+		// 2. Tạo logic trừ kho trong DB Postgres (sync từ Redis)
+		for _, item := range items {
+			// Lưu ý: Cần xử lý logic trừ kho trong bảng ticket_types ở đây
+			// Decrement DB stock (GORM)
+			result := tx.Exec("UPDATE ticket_types SET remaining_quantity = remaining_quantity - ? WHERE id = ? AND remaining_quantity >= ?", item.Quantity, item.TicketTypeID, item.Quantity)
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 0 {
+				return errors.New("không đủ số lượng vé trong database")
+			}
+		}
+
+		return nil
+	})
 }
 
 func (r *orderRepository) GetOrderByID(ctx context.Context, id uuid.UUID) (*entity.Order, error) {

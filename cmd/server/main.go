@@ -14,6 +14,8 @@ import (
 	"github.com/yourname/ticketing-system/internal/adapter/handler"
 	"github.com/yourname/ticketing-system/internal/adapter/repository"
 	"github.com/yourname/ticketing-system/internal/core/service"
+	"github.com/yourname/ticketing-system/pkg/config"
+	redis_client "github.com/yourname/ticketing-system/pkg/redis"
 )
 
 // @title Ticketing System API
@@ -49,6 +51,12 @@ func main() {
 		log.Fatalf("Không thể kết nối Database: %v", err)
 	}
 
+	// Tải cấu hình
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Không thể tải cấu hình: %v", err)
+	}
+
 	// 3. Khởi tạo các lớp (Dependency Injection)
 	// Thứ tự: DB -> Repository -> Service -> Handler
 
@@ -63,9 +71,13 @@ func main() {
 	eventService := service.NewEventService(eventRepo)
 	eventHandler := handler.NewEventHandler(eventService)
 
+	// Cache module
+	redisClient := redis_client.NewRedisClient(cfg)
+	ticketCacheRepo := repository.NewRedisTicketRepository(redisClient)
+
 	// Order module
 	orderRepo := repository.NewOrderRepository(db)
-	orderService := service.NewOrderService(orderRepo, eventRepo)
+	orderService := service.NewOrderService(orderRepo, eventRepo, ticketCacheRepo)
 	orderHandler := handler.NewOrderHandler(orderService)
 
 	// 4. Khởi tạo Fiber

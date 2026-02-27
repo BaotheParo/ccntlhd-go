@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/shopspring/decimal"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -80,9 +81,23 @@ func TestConcurrentOrderPlacement(t *testing.T) {
 		t.Fatalf("Failed to seed ticket: %v", err)
 	}
 
+	// Setup minimal Redis for test
+	// Note: In a real CI environment, you'd spin up an embedded Redis or use a Testcontainer.
+	// Assuming local Redis is running on default port for dev testing.
+	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6380"}) // match local docker port
+	cacheRepo := repository.NewRedisTicketRepository(rdb)
+
+	// Seed initial stock in Redis
+	ctx := context.Background()
+	rdb.FlushDB(ctx) // Clear previously stored keys
+	if err := cacheRepo.SetStock(ctx, ticketID, initialStock); err != nil {
+		t.Fatalf("Failed to seed redis stock: %v", err)
+	}
+
 	// Initialize Service
 	repo := repository.NewOrderRepository(db)
-	svc := service.NewOrderService(db, repo)
+	eventRepo := repository.NewEventRepository(db)
+	svc := service.NewOrderService(repo, eventRepo, cacheRepo)
 
 	// Simulation: 20 concurrenct requests, each buying 1 ticket.
 	// Only 10 should succeed.
@@ -100,8 +115,8 @@ func TestConcurrentOrderPlacement(t *testing.T) {
 			defer wg.Done()
 			ctx := context.Background()
 
-			items := []service.RequestItem{
-				{TicketTypeID: ticketID, Quantity: 1},
+			items := []entity.OrderItem{
+				{TicketTypeID: ticketID, Quantity: 1, UnitPrice: decimal.NewFromFloat(100.00)},
 			}
 
 			// Use the single userID for all requests (simulating one user or valid logic)

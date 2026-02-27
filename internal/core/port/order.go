@@ -9,6 +9,7 @@ import (
 
 type OrderRepositoryPort interface {
 	CreateOrder(ctx context.Context, order *entity.Order) error
+	CreateOrderWithTransaction(ctx context.Context, order *entity.Order, items []entity.OrderItem) error
 	GetOrderByID(ctx context.Context, id uuid.UUID) (*entity.Order, error)
 	GetOrdersByUserID(ctx context.Context, userID uuid.UUID, limit int, offset int) ([]entity.Order, error)
 	UpdateOrderStatus(ctx context.Context, id uuid.UUID, status entity.OrderStatus) error
