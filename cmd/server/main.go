@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -77,7 +80,11 @@ func main() {
 
 	// Order module
 	orderRepo := repository.NewOrderRepository(db)
-	orderService := service.NewOrderService(orderRepo, eventRepo, ticketCacheRepo)
+
+	// Khởi tạo Worker Pool parameters
+	queueSize := 10000
+	numWorkers := 50
+	orderService := service.NewOrderService(orderRepo, eventRepo, ticketCacheRepo, queueSize, numWorkers)
 	orderHandler := handler.NewOrderHandler(orderService)
 
 	// 4. Khởi tạo Fiber
@@ -91,10 +98,35 @@ func main() {
 	// 5. GỌI ROUTER Ở ĐÂY
 	handler.SetupRoutes(app, authHandler, eventHandler, orderHandler, jwtSecret)
 
-	// 6. Chạy Server
+	// 6. Chạy Server và cấu hình Graceful Shutdown
 	port := getEnv("SERVER_PORT", "8080")
-	log.Printf("Starting server on port %s", port)
-	log.Fatal(app.Listen(":" + port))
+
+	// Khởi chạy server trong một goroutine
+	go func() {
+		log.Printf("Starting server on port %s", port)
+		if err := app.Listen(":" + port); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Lỗi server: %v", err)
+		}
+	}()
+
+	// Chờ tín hiệu từ OS (SIGTERM, SIGINT) để thực hiện Graceful Shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	log.Println("\nNhận tín hiệu dừng server, rục rịch tắt hệ thống...")
+
+	// Dừng Fiber từ chối request mới
+	if err := app.Shutdown(); err != nil {
+		log.Fatalf("Fiber Shutdown bị lỗi: %v", err)
+	}
+
+	// Chờ Worker Pool xử lý nốt đơn hàng đang tồn đọng
+	if err := orderService.Shutdown(); err != nil {
+		log.Fatalf("OrderService Shutdown bị lỗi: %v", err)
+	}
+
+	log.Println("Hệ thống đã tắt an toàn!")
 }
 
 func getEnv(key, fallback string) string {

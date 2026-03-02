@@ -97,7 +97,10 @@ func TestConcurrentOrderPlacement(t *testing.T) {
 	// Initialize Service
 	repo := repository.NewOrderRepository(db)
 	eventRepo := repository.NewEventRepository(db)
-	svc := service.NewOrderService(repo, eventRepo, cacheRepo)
+
+	queueSize := 100
+	numWorkers := 10
+	svc := service.NewOrderService(repo, eventRepo, cacheRepo, queueSize, numWorkers)
 
 	// Simulation: 20 concurrenct requests, each buying 1 ticket.
 	// Only 10 should succeed.
@@ -134,7 +137,11 @@ func TestConcurrentOrderPlacement(t *testing.T) {
 		}(i)
 	}
 
+	// Wait for all HTTP requests to finish pushing onto the queue
 	wg.Wait()
+
+	// Wait for background workers to finish processing the queue
+	svc.Shutdown()
 
 	// Verification
 	var updatedTicket entity.TicketType

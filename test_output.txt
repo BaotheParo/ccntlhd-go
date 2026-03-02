@@ -1,0 +1,57 @@
+=== RUN   TestConcurrentOrderPlacement
+2026/02/27 13:18:34 Worker 4 bắt đầu chạy
+2026/02/27 13:18:34 Worker 7 bắt đầu chạy
+2026/02/27 13:18:34 Worker 10 bắt đầu chạy
+2026/02/27 13:18:34 Worker 8 bắt đầu chạy
+2026/02/27 13:18:34 Worker 1 bắt đầu chạy
+2026/02/27 13:18:34 Worker 9 bắt đầu chạy
+2026/02/27 13:18:34 Worker 5 bắt đầu chạy
+2026/02/27 13:18:34 Worker 2 bắt đầu chạy
+2026/02/27 13:18:34 Worker 3 bắt đầu chạy
+2026/02/27 13:18:34 🚀 Khởi chạy 10 workers xử lý đơn hàng
+2026/02/27 13:18:34 Worker 6 bắt đầu chạy
+🚀 Starting concurrent order test...
+2026/02/27 13:18:34 ✅ Đơn hàng 231216ed-f31f-4703-b21e-d8189c5cf677 tạo thành công
+2026/02/27 13:18:34 ✅ Đơn hàng 0f3673a2-f971-487e-ab36-bd6aaa45ab74 tạo thành công
+Error placement: không thể giữ vé (loại 85b30a1c-36da-4969-9333-9d16c564c839): insufficient ticket stock
+Error placement: không thể giữ vé (loại 85b30a1c-36da-4969-9333-9d16c564c839): insufficient ticket stock
+Error placement: không thể giữ vé (loại 85b30a1c-36da-4969-9333-9d16c564c839): insufficient ticket stock
+Error placement: không thể giữ vé (loại 85b30a1c-36da-4969-9333-9d16c564c839): insufficient ticket stock
+Error placement: không thể giữ vé (loại 85b30a1c-36da-4969-9333-9d16c564c839): insufficient ticket stock
+2026/02/27 13:18:34 ✅ Đơn hàng de659b3b-4e3e-4f88-b95a-5a69162cc70e tạo thành công
+Error placement: không thể giữ vé (loại 85b30a1c-36da-4969-9333-9d16c564c839): insufficient ticket stock
+Error placement: không thể giữ vé (loại 85b30a1c-36da-4969-9333-9d16c564c839): insufficient ticket stock
+Error placement: không thể giữ vé (loại 85b30a1c-36da-4969-9333-9d16c564c839): insufficient ticket stock
+Error placement: không thể giữ vé (loại 85b30a1c-36da-4969-9333-9d16c564c839): insufficient ticket stock
+Error placement: không thể giữ vé (loại 85b30a1c-36da-4969-9333-9d16c564c839): insufficient ticket stock
+✅ Test Complete:
+   Initial Stock: 10
+   Concurrent Requests: 20
+   Successful Orders: 10
+   Failed Orders: 10
+   Remaining Stock in DB: 7
+    concurrency_test.go:159: Expected remaining quantity 0, got 7
+    concurrency_test.go:165: DB Consistency check failed: sold 3 != initial 10
+2026/02/27 13:18:34 🛑 Đang dừng xử lý đơn hàng (Đợi các worker hoàn thành)...
+2026/02/27 13:18:34 Worker 4 đã dừng
+2026/02/27 13:18:34 Worker 3 đã dừng
+2026/02/27 13:18:34 Worker 8 đã dừng
+2026/02/27 13:18:34 ✅ Đơn hàng cea8f976-effd-481f-b4d3-7ec8b6bb8be8 tạo thành công
+2026/02/27 13:18:34 Worker 7 đã dừng
+2026/02/27 13:18:34 ✅ Đơn hàng 3e6b96bc-603b-4f67-ba69-3761707a3b09 tạo thành công
+2026/02/27 13:18:34 Worker 10 đã dừng
+2026/02/27 13:18:34 ✅ Đơn hàng eed5cb37-680a-4581-b72b-ada5da23ccfa tạo thành công
+2026/02/27 13:18:34 Worker 1 đã dừng
+2026/02/27 13:18:34 ✅ Đơn hàng fa3ed252-ad0f-4687-9df4-6df075a1f044 tạo thành công
+2026/02/27 13:18:34 Worker 2 đã dừng
+2026/02/27 13:18:34 ✅ Đơn hàng a639fdef-45ee-401d-af73-12b7c743d850 tạo thành công
+2026/02/27 13:18:34 Worker 6 đã dừng
+2026/02/27 13:18:34 ✅ Đơn hàng 2fb7d6cc-1c7b-42c6-9fd4-e3068ec0e3ce tạo thành công
+2026/02/27 13:18:34 Worker 9 đã dừng
+2026/02/27 13:18:34 ✅ Đơn hàng 8cb5caa4-ebc7-4c5f-85ce-6ec2cca7c9a9 tạo thành công
+2026/02/27 13:18:34 Worker 5 đã dừng
+2026/02/27 13:18:34 ✅ Tất cả worker đã dừng hoàn toàn
+--- FAIL: TestConcurrentOrderPlacement (0.12s)
+FAIL
+FAIL	github.com/yourname/ticketing-system/tests/integration	0.242s
+FAIL

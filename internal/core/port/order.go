@@ -23,4 +23,5 @@ type OrderServicePort interface {
 	GetOrder(ctx context.Context, id uuid.UUID) (*entity.Order, error)
 	GetUserOrders(ctx context.Context, userID uuid.UUID, limit int, offset int) ([]entity.Order, error)
 	CancelOrder(ctx context.Context, id uuid.UUID) error
+	Shutdown() error
 }
