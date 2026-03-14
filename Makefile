@@ -11,3 +11,6 @@ logs:
 
 db-shell:
 	docker exec -it ticket_db psql -U user -d ticket_db
+
+load-test:
+	docker run --rm -i grafana/k6 run - < tests/load/flash_sale_test.js
