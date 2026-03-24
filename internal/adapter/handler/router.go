@@ -14,7 +14,7 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 	})
 
 	api := app.Group("/api/v1")
-	// Swagger
+	// Swagger UI
 	api.Get("/swagger/*", swagger.HandlerDefault)
 
 	// Auth routes
@@ -31,6 +31,10 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 		})
 	})
 
+	// Users routes (additional user endpoints)
+	users := api.Group("/users", AuthMiddleware(jwtSecret))
+	users.Get("/me/orders", orderHandler.GetUserOrders) // Get user's order history
+
 	// Event routes
 	events := api.Group("/events")
 	events.Post("/", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.CreateEvent) // Create event (admin only)
@@ -40,8 +44,8 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 
 	// Order routes
 	orders := api.Group("/orders", AuthMiddleware(jwtSecret))
-	orders.Post("/", orderHandler.PlaceOrder)             // Create order
-	orders.Get("/", orderHandler.GetUserOrders)           // Get user's orders
-	orders.Get("/:id", orderHandler.GetOrder)             // Get order by ID
-	orders.Post("/:id/cancel", orderHandler.CancelOrder)  // Cancel order
+	orders.Post("/", orderHandler.PlaceOrder)            // Create order
+	orders.Get("/", orderHandler.GetUserOrders)          // Get user's orders
+	orders.Get("/:id", orderHandler.GetOrder)            // Get order by ID
+	orders.Post("/:id/cancel", orderHandler.CancelOrder) // Cancel order
 }
