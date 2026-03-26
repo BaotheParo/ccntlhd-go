@@ -38,9 +38,13 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 	// Event routes
 	events := api.Group("/events")
 	events.Post("/", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.CreateEvent) // Create event (admin only)
-	events.Get("/:id", eventHandler.GetEvent)                                              // Get event by ID
-	events.Get("/slug/:slug", eventHandler.GetEventBySlug)                                 // Get event by slug
-	events.Get("", eventHandler.ListEvents)                                                // List all events
+	events.Put("/:id", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.UpdateEvent)
+	events.Delete("/:id", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.DeleteEvent)
+
+	events.Get("/search", eventHandler.ListEventsAdvanced)
+	events.Get("/:id", eventHandler.GetEvent)              // Get event by ID
+	events.Get("/slug/:slug", eventHandler.GetEventBySlug) // Get event by slug
+	events.Get("", eventHandler.ListEvents)                // List all events
 
 	// Order routes
 	orders := api.Group("/orders", AuthMiddleware(jwtSecret))
