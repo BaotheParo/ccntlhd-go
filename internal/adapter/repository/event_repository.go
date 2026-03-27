@@ -74,6 +74,8 @@ func (r *eventRepository) ListEventsAdvanced(ctx context.Context, f entity.Event
 	}
 	if f.Status != "" {
 		query = query.Where("status = ?", f.Status)
+	} else {
+		query = query.Where("status <> ?", entity.EventStatusDraft)
 	}
 
 	if f.FromTime != nil {

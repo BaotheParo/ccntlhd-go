@@ -156,7 +156,7 @@ func (s *eventService) ListEventsAdvanced(ctx context.Context, req entity.ListEv
 	if req.Limit > 100 {
 		req.Limit = 100
 	}
-	offset := (req.Page - 1) * req.Limit
+	offset := (req.Page - 1) * req.Limit //offset: bỏ bao nhiêu event trước khi lấy
 
 	var fromtime *time.Time
 	var totime *time.Time
@@ -165,7 +165,7 @@ func (s *eventService) ListEventsAdvanced(ctx context.Context, req entity.ListEv
 			fromtime = &t
 		}
 	}
-	if req.FromTime != "" {
+	if req.ToTime != "" {
 		if t, err := time.Parse(time.RFC3339, req.ToTime); err == nil {
 			totime = &t
 		}
