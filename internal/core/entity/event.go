@@ -27,6 +27,7 @@ type Event struct {
 	Status    EventStatus `gorm:"type:varchar(20);default:'DRAFT'" json:"status"`
 	CreatedAt time.Time   `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time   `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt *time.Time  `gorm:"index" json:"deleted_at"`
 }
 
 type TicketType struct {
@@ -51,4 +52,31 @@ type CreateTicketTypeRequest struct {
 	Name            string          `json:"name" validate:"required,min=3"`
 	Price           decimal.Decimal `json:"price" validate:"required"`
 	InitialQuantity int             `json:"initial_quantity" validate:"required,min=1"`
+}
+
+type ListEventRequest struct {
+	Page     int
+	Limit    int
+	Search   string
+	Status   string
+	FromTime string
+	ToTime   string
+}
+
+type EventFilter struct {
+	Limit    int
+	Offset   int
+	Search   string
+	Status   EventStatus
+	FromTime *time.Time
+	ToTime   *time.Time
+}
+
+type UpdateEventRequest struct {
+	Name      string    `json:"name"`
+	Location  string    `json:"location"`
+	BannerURL string    `json:"banner_url"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
+	Status    string    `json:"status"`
 }

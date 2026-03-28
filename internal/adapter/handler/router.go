@@ -7,7 +7,7 @@ import (
 )
 
 // SetupRoutes tập trung tất cả định nghĩa API vào một chỗ
-func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHandler, orderHandler *OrderHandler, jwtSecret string) {
+func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHandler, orderHandler *OrderHandler, statisticsHandler *StatisticsHandler, jwtSecret string) {
 	// Health check endpoint
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
@@ -38,9 +38,13 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 	// Event routes
 	events := api.Group("/events")
 	events.Post("/", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.CreateEvent) // Create event (admin only)
-	events.Get("/:id", eventHandler.GetEvent)                                              // Get event by ID
-	events.Get("/slug/:slug", eventHandler.GetEventBySlug)                                 // Get event by slug
-	events.Get("", eventHandler.ListEvents)                                                // List all events
+	events.Put("/:id", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.UpdateEvent)
+	events.Delete("/:id", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.DeleteEvent)
+
+	events.Get("/search", eventHandler.ListEventsAdvanced)
+	events.Get("/:id", eventHandler.GetEvent)              // Get event by ID
+	events.Get("/slug/:slug", eventHandler.GetEventBySlug) // Get event by slug
+	events.Get("", eventHandler.ListEvents)                // List all events
 
 	// Order routes
 	orders := api.Group("/orders", AuthMiddleware(jwtSecret))
@@ -48,4 +52,10 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 	orders.Get("/", orderHandler.GetUserOrders)          // Get user's orders
 	orders.Get("/:id", orderHandler.GetOrder)            // Get order by ID
 	orders.Post("/:id/cancel", orderHandler.CancelOrder) // Cancel order
+
+	// Admin routes
+	admin := api.Group("/admin", AuthMiddleware(jwtSecret), AdminMiddleware)
+
+	// Statistics routes
+	admin.Get("/statistics/events", statisticsHandler.GetEventStatistics)
 }

@@ -145,3 +145,89 @@ func validateCreateTicketTypeRequest(req entity.CreateTicketTypeRequest) error {
 	}
 	return nil
 }
+
+func (s *eventService) ListEventsAdvanced(ctx context.Context, req entity.ListEventRequest) ([]entity.Event, int64, error) {
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.Limit <= 0 {
+		req.Limit = 10
+	}
+	if req.Limit > 100 {
+		req.Limit = 100
+	}
+	offset := (req.Page - 1) * req.Limit //offset: bỏ bao nhiêu event trước khi lấy
+
+	var fromtime *time.Time
+	var totime *time.Time
+	if req.FromTime != "" {
+		if t, err := time.Parse(time.RFC3339, req.FromTime); err == nil {
+			fromtime = &t
+		}
+	}
+	if req.ToTime != "" {
+		if t, err := time.Parse(time.RFC3339, req.ToTime); err == nil {
+			totime = &t
+		}
+	}
+
+	var status entity.EventStatus
+	switch req.Status {
+	case string(entity.EventStatusDraft),
+		string(entity.EventStatusPublished),
+		string(entity.EventStatusCancelled),
+		string(entity.EventStatusEnded):
+		status = entity.EventStatus(req.Status)
+	default:
+		status = ""
+	}
+
+	filter := entity.EventFilter{
+		Limit:    req.Limit,
+		Offset:   offset,
+		Search:   req.Search,
+		Status:   status,
+		FromTime: fromtime,
+		ToTime:   totime,
+	}
+
+	return s.eventRepo.ListEventsAdvanced(ctx, filter)
+}
+
+func (s *eventService) UpdateEvent(ctx context.Context, id uuid.UUID, req entity.UpdateEventRequest) (*entity.Event, error) {
+	event, err := s.eventRepo.GetEventByID(ctx, id)
+	if err != nil {
+		return nil, errors.New("event không tồn tại")
+	}
+
+	if req.Name != "" {
+		event.Name = req.Name
+	}
+	if req.Location != "" {
+		event.Location = req.Location
+	}
+	if !req.StartTime.IsZero() {
+		event.StartTime = req.StartTime
+	}
+	if !req.EndTime.IsZero() {
+		event.EndTime = req.EndTime
+	}
+	if req.Status != "" {
+		event.Status = entity.EventStatus(req.Status)
+	}
+	event.UpdatedAt = time.Now()
+
+	if err := s.eventRepo.UpdateEvent(ctx, event); err != nil {
+		return nil, err
+	}
+
+	return event, nil
+}
+
+func (s *eventService) DeleteEvent(ctx context.Context, id uuid.UUID) error {
+	_, err := s.eventRepo.GetEventByID(ctx, id)
+	if err != nil {
+		return errors.New("Không tìm thấy id này")
+	}
+	return s.eventRepo.DeleteEvent(ctx, id)
+}
