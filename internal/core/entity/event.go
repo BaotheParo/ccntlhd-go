@@ -54,6 +54,11 @@ type CreateTicketTypeRequest struct {
 	InitialQuantity int             `json:"initial_quantity" validate:"required,min=1"`
 }
 
+type CreateEventWithTicketsRequest struct {
+	Event       CreateEventRequest        `json:"event"`
+	TicketTypes []CreateTicketTypeRequest `json:"ticket_types"`
+}
+
 type ListEventRequest struct {
 	Page     int
 	Limit    int

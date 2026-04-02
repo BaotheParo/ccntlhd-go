@@ -14,8 +14,10 @@ type EventRepositoryPort interface {
 	ListEvents(ctx context.Context, limit int, offset int) ([]entity.Event, error)
 	UpdateEvent(ctx context.Context, event *entity.Event) error
 	DeleteEvent(ctx context.Context, id uuid.UUID) error
+
 	CreateTicketType(ctx context.Context, ticketType *entity.TicketType) error
 	CreateTicketTypes(ctx context.Context, ticketTypes []entity.TicketType) error
+
 	ListEventsAdvanced(ctx context.Context, query entity.EventFilter) ([]entity.Event, int64, error)
 }
 

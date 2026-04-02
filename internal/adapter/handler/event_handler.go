@@ -34,6 +34,35 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(event)
 }
 
+func (h *EventHandler) CreateEventWithTickets(c *fiber.Ctx) error {
+	var req entity.CreateEventWithTicketsRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Dữ liệu không hợp lệ",
+		})
+	}
+
+	if req.Event.Name == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Dữ liệu không hợp lệ",
+		})
+	}
+
+	event, err := h.svc.CreateEventWithTickets(c.Context(), req.Event, req.TicketTypes)
+
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "event created successfully",
+		"data":    event,
+	})
+}
+
 func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 	id := c.Params("id")
 
