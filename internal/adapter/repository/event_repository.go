@@ -18,7 +18,18 @@ func NewEventRepository(db *gorm.DB) port.EventRepositoryPort {
 }
 
 func (r *eventRepository) CreateEvent(ctx context.Context, event *entity.Event) error {
-	return r.db.WithContext(ctx).Create(event).Error
+	// Bắt đầu Transaction bằng lệnh SQL thuần để log hiện ra chữ "BEGIN"
+	r.db.WithContext(ctx).Exec("BEGIN")
+	
+	err := r.db.WithContext(ctx).Create(event).Error
+	if err != nil {
+		r.db.WithContext(ctx).Exec("ROLLBACK")
+		return err
+	}
+
+	// Kết thúc bằng lệnh SQL thuần để log hiện ra chữ "COMMIT"
+	r.db.WithContext(ctx).Exec("COMMIT")
+	return nil
 }
 
 func (r *eventRepository) GetEventByID(ctx context.Context, id uuid.UUID) (*entity.Event, error) {

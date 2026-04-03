@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/yourname/ticketing-system/internal/adapter/handler"
 	"github.com/yourname/ticketing-system/internal/adapter/repository"
@@ -44,7 +45,9 @@ func main() {
 
 	// Chờ DB sẵn sàng (Retry logic)
 	for i := 0; i < 5; i++ {
-		db, err = gorm.Open(postgres.Open(dbConnStr), &gorm.Config{})
+		db, err = gorm.Open(postgres.Open(dbConnStr), &gorm.Config{
+			Logger: gormlogger.Default.LogMode(gormlogger.Info),
+		})
 		if err == nil {
 			break
 		}
@@ -54,6 +57,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Không thể kết nối Database: %v", err)
 	}
+	log.Println("✅ Connected to Database successfully!")
 
 	// Tải cấu hình
 	cfg, err := config.LoadConfig()

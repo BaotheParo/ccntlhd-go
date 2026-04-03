@@ -38,10 +38,15 @@ func (s *authService) Register(ctx context.Context, req entity.RegisterRequest) 
 		return nil, err
 	}
 
-	// 3. Khởi tạo thực thể User mới (Dùng Constructor như bạn đã hỏi)
+	// 3. Khởi tạo thực thể User mới
+	username := req.Username
+	if username == "" {
+		username = req.FullName
+	}
+
 	newUser := &entity.User{
 		ID:           uuid.New(),
-		Username:     req.Username,
+		Username:     username,
 		Email:        req.Email,
 		PasswordHash: hashedPassword,
 		Role:         entity.RoleUser,
