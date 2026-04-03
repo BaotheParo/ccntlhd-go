@@ -85,19 +85,19 @@ definitions:
       username:
         type: string
     type: object
-  service.PlaceOrderRequest:
+  handler.CreateOrderRequest:
     properties:
       items:
         items:
-          $ref: '#/definitions/service.RequestItem'
+          properties:
+            quantity:
+              type: integer
+            ticket_type_id:
+              type: string
+            unit_price:
+              type: string
+          type: object
         type: array
-    type: object
-  service.RequestItem:
-    properties:
-      quantity:
-        type: integer
-      ticket_type_id:
-        type: string
     type: object
 host: localhost:8080
 info:
@@ -106,6 +106,132 @@ info:
   title: Ticketing System API
   version: "1.0"
 paths:
+  /api/v1/orders:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - default: 10
+        description: Limit
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Order'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get user's orders
+      tags:
+      - Order
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/entity.Order'
+      security:
+      - BearerAuth: []
+      summary: Place a new order
+      tags:
+      - Order
+  /api/v1/orders/{id}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Order'
+      security:
+      - BearerAuth: []
+      summary: Get order by ID
+      tags:
+      - Order
+  /api/v1/orders/{id}/cancel:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cancel an order
+      tags:
+      - Order
+  /api/v1/users/me/orders:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - default: 10
+        description: Limit
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Order'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get user's orders
+      tags:
+      - Order
   /auth/login:
     post:
       consumes:
@@ -150,27 +276,4 @@ paths:
       summary: Register new user
       tags:
       - Auth
-  /orders:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Order Payload
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/service.PlaceOrderRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/entity.Order'
-      security:
-      - BearerAuth: []
-      summary: Place a new order
-      tags:
-      - Order
 swagger: "2.0"

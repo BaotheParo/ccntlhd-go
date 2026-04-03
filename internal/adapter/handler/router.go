@@ -7,14 +7,14 @@ import (
 )
 
 // SetupRoutes tập trung tất cả định nghĩa API vào một chỗ
-func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHandler, orderHandler *OrderHandler, jwtSecret string) {
+func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHandler, orderHandler *OrderHandler, statisticsHandler *StatisticsHandler, jwtSecret string) {
 	// Health check endpoint
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 
 	api := app.Group("/api/v1")
-	// Swagger
+	// Swagger UI
 	api.Get("/swagger/*", swagger.HandlerDefault)
 
 	// Auth routes
@@ -31,17 +31,32 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 		})
 	})
 
+	// Users routes (additional user endpoints)
+	users := api.Group("/users", AuthMiddleware(jwtSecret))
+	users.Get("/me/orders", orderHandler.GetUserOrders) // Get user's order history
+
 	// Event routes
 	events := api.Group("/events")
 	events.Post("/", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.CreateEvent) // Create event (admin only)
-	events.Get("/:id", eventHandler.GetEvent)                                              // Get event by ID
-	events.Get("/slug/:slug", eventHandler.GetEventBySlug)                                 // Get event by slug
-	events.Get("", eventHandler.ListEvents)                                                // List all events
+	events.Post("/with-tickets", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.CreateEventWithTickets)
+	events.Put("/:id", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.UpdateEvent)
+	events.Delete("/:id", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.DeleteEvent)
+
+	events.Get("/search", eventHandler.ListEventsAdvanced)
+	events.Get("/slug/:slug", eventHandler.GetEventBySlug) // Get event by slug
+	events.Get("/:id", eventHandler.GetEvent)              // Get event by ID
+	events.Get("", eventHandler.ListEvents)                // List all events
 
 	// Order routes
 	orders := api.Group("/orders", AuthMiddleware(jwtSecret))
-	orders.Post("/", orderHandler.PlaceOrder)             // Create order
-	orders.Get("/", orderHandler.GetUserOrders)           // Get user's orders
-	orders.Get("/:id", orderHandler.GetOrder)             // Get order by ID
-	orders.Post("/:id/cancel", orderHandler.CancelOrder)  // Cancel order
+	orders.Post("/", orderHandler.PlaceOrder)            // Create order
+	orders.Get("/", orderHandler.GetUserOrders)          // Get user's orders
+	orders.Get("/:id", orderHandler.GetOrder)            // Get order by ID
+	orders.Post("/:id/cancel", orderHandler.CancelOrder) // Cancel order
+
+	// Admin routes
+	admin := api.Group("/admin", AuthMiddleware(jwtSecret), AdminMiddleware)
+
+	// Statistics routes
+	admin.Get("/statistics/events", statisticsHandler.GetEventStatistics)
 }

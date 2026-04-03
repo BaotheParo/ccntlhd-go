@@ -34,6 +34,35 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(event)
 }
 
+func (h *EventHandler) CreateEventWithTickets(c *fiber.Ctx) error {
+	var req entity.CreateEventWithTicketsRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Dữ liệu không hợp lệ",
+		})
+	}
+
+	if req.Event.Name == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Dữ liệu không hợp lệ",
+		})
+	}
+
+	event, err := h.svc.CreateEventWithTickets(c.Context(), req.Event, req.TicketTypes)
+
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "event created successfully",
+		"data":    event,
+	})
+}
+
 func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -84,4 +113,71 @@ func (h *EventHandler) ListEvents(c *fiber.Ctx) error {
 		"limit":  limit,
 		"offset": offset,
 	})
+}
+
+func (h *EventHandler) ListEventsAdvanced(c *fiber.Ctx) error {
+	var req entity.ListEventRequest
+	if err := c.QueryParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Query không hợp lệ",
+		})
+	}
+
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.Limit <= 0 {
+		req.Limit = 10
+	}
+
+	events, total, err := h.svc.ListEventsAdvanced(c.Context(), req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON((fiber.Map{
+			"error": err.Error(),
+		}))
+	}
+	totalPages := int((total + int64(req.Limit) - 1) / int64(req.Limit))
+
+	return c.JSON(fiber.Map{
+		"data": events,
+		"pagination": fiber.Map{
+			"page":        req.Page,
+			"limit":       req.Limit,
+			"total":       total,
+			"total_pages": totalPages,
+		},
+	})
+}
+
+func (h *EventHandler) UpdateEvent(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	eventID, err := uuid.Parse(id)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "ID không hợp lệ"})
+	}
+
+	var req entity.UpdateEventRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Dữ liệu không hợp lệ"})
+	}
+
+	event, err := h.svc.UpdateEvent(c.Context(), eventID, req)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(event)
+}
+
+func (h *EventHandler) DeleteEvent(c *fiber.Ctx) error {
+	id := c.Params("id")
+	eventID, err := uuid.Parse(id)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "ID không hợp lệ"})
+	}
+
+	if err := h.svc.DeleteEvent(c.Context(), eventID); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"message": "Xóa thành công"})
 }

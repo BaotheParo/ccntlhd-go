@@ -144,6 +144,7 @@ func (h *OrderHandler) GetOrder(c *fiber.Ctx) error {
 // @Param offset query int false "Offset" default(0)
 // @Success 200 {array} entity.Order
 // @Router /api/v1/orders [get]
+// @Router /api/v1/users/me/orders [get]
 func (h *OrderHandler) GetUserOrders(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -196,7 +197,7 @@ func (h *OrderHandler) GetUserOrders(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Order ID"
-// @Success 200 {object} fiber.Map
+// @Success 200 {object} map[string]string
 // @Router /api/v1/orders/{id}/cancel [post]
 func (h *OrderHandler) CancelOrder(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

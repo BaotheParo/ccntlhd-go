@@ -79,6 +79,11 @@ func main() {
 	eventService := service.NewEventService(eventRepo)
 	eventHandler := handler.NewEventHandler(eventService)
 
+	// Statistics module
+	statisticsRepo := repository.NewStatisticRepository(db)
+	statisticsService := service.NewStatisticsService(statisticsRepo)
+	statisticsHandler := handler.NewStatisticsHandler(statisticsService)
+
 	// Cache module
 	redisClient := redis_client.NewRedisClient(cfg)
 	ticketCacheRepo := repository.NewRedisTicketRepository(redisClient)
@@ -106,7 +111,7 @@ func main() {
 	app.Use(logger.New())
 
 	// 5. GỌI ROUTER Ở ĐÂY
-	handler.SetupRoutes(app, authHandler, eventHandler, orderHandler, jwtSecret)
+	handler.SetupRoutes(app, authHandler, eventHandler, orderHandler, statisticsHandler, jwtSecret)
 
 	// 6. Chạy Server và cấu hình Graceful Shutdown
 	port := getEnv("SERVER_PORT", "8080")
