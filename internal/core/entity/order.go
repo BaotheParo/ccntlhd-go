@@ -32,3 +32,7 @@ type OrderItem struct {
 	Quantity     int             `gorm:"not null" json:"quantity"`
 	UnitPrice    decimal.Decimal `gorm:"column:price;type:decimal(10,2);not null" json:"unit_price"`
 }
+
+type UpdateOrderStatusRequest struct {
+	Status string `json:"status" validate:"required,oneof=PAID CANCELLED"`
+}

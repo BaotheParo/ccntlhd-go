@@ -4,10 +4,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/swagger"
 	_ "github.com/yourname/ticketing-system/docs"
+	"github.com/yourname/ticketing-system/internal/core/port"
 )
 
 // SetupRoutes tập trung tất cả định nghĩa API vào một chỗ
-func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHandler, orderHandler *OrderHandler, statisticsHandler *StatisticsHandler, jwtSecret string) {
+func SetupRoutes(app *fiber.App, userRepo port.UserRepositoryPort, authHandler *AuthHandler, eventHandler *EventHandler, orderHandler *OrderHandler, statisticsHandler *StatisticsHandler, jwtSecret string) {
 	// Health check endpoint
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
@@ -23,7 +24,7 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 	auth.Post("/login", authHandler.Login)
 
 	// User routes
-	user := api.Group("/user", AuthMiddleware(jwtSecret))
+	user := api.Group("/user", AuthMiddleware(jwtSecret, userRepo))
 	user.Get("/me", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"user_id": c.Locals("user_id"),
@@ -32,15 +33,13 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 	})
 
 	// Users routes (additional user endpoints)
-	users := api.Group("/users", AuthMiddleware(jwtSecret))
+	users := api.Group("/users", AuthMiddleware(jwtSecret, userRepo))
 	users.Get("/me/orders", orderHandler.GetUserOrders) // Get user's order history
 
 	// Event routes
 	events := api.Group("/events")
-	events.Post("/", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.CreateEvent) // Create event (admin only)
-	events.Post("/with-tickets", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.CreateEventWithTickets)
-	events.Put("/:id", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.UpdateEvent)
-	events.Delete("/:id", AuthMiddleware(jwtSecret), AdminMiddleware, eventHandler.DeleteEvent)
+	events.Post("/", AuthMiddleware(jwtSecret, userRepo), AdminMiddleware, eventHandler.CreateEvent) // Create event (admin only)
+	events.Post("/with-tickets", AuthMiddleware(jwtSecret, userRepo), AdminMiddleware, eventHandler.CreateEventWithTickets)
 
 	events.Get("/search", eventHandler.ListEventsAdvanced)
 	events.Get("/slug/:slug", eventHandler.GetEventBySlug) // Get event by slug
@@ -48,15 +47,26 @@ func SetupRoutes(app *fiber.App, authHandler *AuthHandler, eventHandler *EventHa
 	events.Get("", eventHandler.ListEvents)                // List all events
 
 	// Order routes
-	orders := api.Group("/orders", AuthMiddleware(jwtSecret))
+	orders := api.Group("/orders", AuthMiddleware(jwtSecret, userRepo))
 	orders.Post("/", orderHandler.PlaceOrder)            // Create order
 	orders.Get("/", orderHandler.GetUserOrders)          // Get user's orders
 	orders.Get("/:id", orderHandler.GetOrder)            // Get order by ID
 	orders.Post("/:id/cancel", orderHandler.CancelOrder) // Cancel order
 
 	// Admin routes
-	admin := api.Group("/admin", AuthMiddleware(jwtSecret), AdminMiddleware)
+	admin := api.Group("/admin", AuthMiddleware(jwtSecret, userRepo), AdminMiddleware)
 
-	// Statistics routes
+	// Admin Event & Ticket Routes
+	admin.Put("/events/:id", eventHandler.UpdateEvent)
+	admin.Delete("/events/:id", eventHandler.DeleteEvent)
+	admin.Post("/events/:id/ticket-types", eventHandler.CreateTicketType)
+	admin.Put("/ticket-types/:ticket_id", eventHandler.UpdateTicketType)
+
+	// Admin Order Routes
+	admin.Get("/orders", orderHandler.ListAdminOrders)
+	admin.Put("/orders/:id/status", orderHandler.UpdateOrderStatus)
+
+	// Admin Statistics Routes
 	admin.Get("/statistics/events", statisticsHandler.GetEventStatistics)
+	admin.Get("/statistics/dashboard", statisticsHandler.GetDashboardStats)
 }

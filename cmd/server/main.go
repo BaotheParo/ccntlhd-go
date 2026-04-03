@@ -18,6 +18,7 @@ import (
 
 	"github.com/yourname/ticketing-system/internal/adapter/handler"
 	"github.com/yourname/ticketing-system/internal/adapter/repository"
+	"github.com/yourname/ticketing-system/internal/core/entity"
 	"github.com/yourname/ticketing-system/internal/core/service"
 	"github.com/yourname/ticketing-system/pkg/config"
 	redis_client "github.com/yourname/ticketing-system/pkg/redis"
@@ -59,6 +60,13 @@ func main() {
 	}
 	log.Println("✅ Connected to Database successfully!")
 
+	// Tự động Migrate cấu trúc Database
+	if err := db.AutoMigrate(&entity.User{}, &entity.Event{}, &entity.TicketType{}, &entity.Order{}, &entity.OrderItem{}); err != nil {
+		log.Printf("⚠️ Lỗi Migrate Database: %v", err)
+	} else {
+		log.Println("✅ AutoMigrate Database successfully!")
+	}
+
 	// Tải cấu hình
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -68,25 +76,24 @@ func main() {
 	// 3. Khởi tạo các lớp (Dependency Injection)
 	// Thứ tự: DB -> Repository -> Service -> Handler
 
+	// Khởi tạo redisClient sớm để dùng cho TicketCacheRepo
+	redisClient := redis_client.NewRedisClient(cfg)
+	ticketCacheRepo := repository.NewRedisTicketRepository(redisClient)
+
 	// User module
-	sqlDB, _ := db.DB()
-	userRepo := repository.NewUserRepository(sqlDB)
+	userRepo := repository.NewUserRepository(db)
 	authService := service.NewAuthService(userRepo, jwtSecret)
 	authHandler := handler.NewAuthHandler(authService)
 
 	// Event module
 	eventRepo := repository.NewEventRepository(db)
-	eventService := service.NewEventService(eventRepo)
+	eventService := service.NewEventService(eventRepo, ticketCacheRepo)
 	eventHandler := handler.NewEventHandler(eventService)
 
 	// Statistics module
 	statisticsRepo := repository.NewStatisticRepository(db)
 	statisticsService := service.NewStatisticsService(statisticsRepo)
 	statisticsHandler := handler.NewStatisticsHandler(statisticsService)
-
-	// Cache module
-	redisClient := redis_client.NewRedisClient(cfg)
-	ticketCacheRepo := repository.NewRedisTicketRepository(redisClient)
 
 	// Order module
 	orderRepo := repository.NewOrderRepository(db)
@@ -111,7 +118,7 @@ func main() {
 	app.Use(logger.New())
 
 	// 5. GỌI ROUTER Ở ĐÂY
-	handler.SetupRoutes(app, authHandler, eventHandler, orderHandler, statisticsHandler, jwtSecret)
+	handler.SetupRoutes(app, userRepo, authHandler, eventHandler, orderHandler, statisticsHandler, jwtSecret)
 
 	// 6. Chạy Server và cấu hình Graceful Shutdown
 	port := getEnv("SERVER_PORT", "8080")

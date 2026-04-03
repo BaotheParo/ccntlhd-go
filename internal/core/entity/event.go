@@ -85,3 +85,8 @@ type UpdateEventRequest struct {
 	EndTime   time.Time `json:"end_time"`
 	Status    string    `json:"status"`
 }
+
+type UpdateTicketTypeRequest struct {
+	Price    decimal.Decimal `json:"price"`
+	Quantity int             `json:"quantity"`
+}

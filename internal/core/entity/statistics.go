@@ -7,3 +7,9 @@ type EventStatistics struct {
 	Cancelled int64 `json:"cancelled"`
 	Ended     int64 `json:"ended"`
 }
+
+type DashboardStatsResponse struct {
+	TotalOrders      int     `json:"total_orders"`
+	TotalRevenue     float64 `json:"total_revenue"`
+	TotalTicketsSold int     `json:"total_tickets_sold"`
+}

@@ -17,7 +17,8 @@ type User struct {
 	Email        string                 `json:"email"`
 	PasswordHash string                 `json:"-"`
 	Role         string                 `json:"role"`
-	ProfileData  map[string]interface{} `json:"profile_data"`
+	IsActive     bool                   `gorm:"default:true" json:"is_active"`
+	ProfileData  map[string]interface{} `gorm:"serializer:json" json:"profile_data"`
 	CreatedAt    time.Time              `json:"created_at"`
 	UpdatedAt    time.Time              `json:"updated_at"`
 }
@@ -32,4 +33,8 @@ type RegisterRequest struct {
 	FullName string `json:"full_name"`
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=6"`
+}
+
+type UpdateUserStatusRequest struct {
+	IsActive *bool `json:"is_active" validate:"required"`
 }

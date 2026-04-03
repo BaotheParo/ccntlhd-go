@@ -95,3 +95,26 @@ func (s *authService) ValidateToken(ctx context.Context, token string) (*entity.
 	// Lấy lại thông tin User từ DB dựa trên ID trong token (để đảm bảo user vẫn tồn tại)
 	return s.userRepo.GetUserByID(ctx, claims.UserID)
 }
+
+func (s *authService) ListUsers(ctx context.Context, page, limit int) ([]entity.User, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+	return s.userRepo.ListUsers(ctx, page, limit)
+}
+
+func (s *authService) ToggleUserStatus(ctx context.Context, id string, isActive *bool) error {
+	if isActive == nil {
+		return errors.New("trạng thái is_active không được để trống")
+	}
+	// Kiểm tra user có tồn tại hay không
+	_, err := s.userRepo.GetUserByID(ctx, id)
+	if err != nil {
+		return errors.New("không tìm thấy người dùng")
+	}
+
+	return s.userRepo.UpdateUserStatus(ctx, id, *isActive)
+}

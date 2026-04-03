@@ -79,11 +79,27 @@ func (m *mockEventRepository) CreateTicketTypes(ctx context.Context, ticketTypes
 	return nil
 }
 
+func (m *mockEventRepository) GetTicketTypeByID(ctx context.Context, id uuid.UUID) (*entity.TicketType, error) {
+	if ticketType, ok := m.ticketTypes[id]; ok {
+		return ticketType, nil
+	}
+	return nil, gorm.ErrRecordNotFound
+}
+
+func (m *mockEventRepository) UpdateTicketType(ctx context.Context, ticketType *entity.TicketType) error {
+	m.ticketTypes[ticketType.ID] = ticketType
+	return nil
+}
+
+func (m *mockEventRepository) ListEventsAdvanced(ctx context.Context, f entity.EventFilter) ([]entity.Event, int64, error) {
+	return nil, 0, nil
+}
+
 // Tests
 func TestCreateEvent_Success(t *testing.T) {
 	// Arrange
 	mockRepo := NewMockEventRepository()
-	svc := service.NewEventService(mockRepo)
+	svc := service.NewEventService(mockRepo, nil)
 	ctx := context.Background()
 
 	req := entity.CreateEventRequest{
@@ -126,7 +142,7 @@ func TestCreateEvent_Success(t *testing.T) {
 
 func TestCreateEvent_EmptyName(t *testing.T) {
 	mockRepo := NewMockEventRepository()
-	svc := service.NewEventService(mockRepo)
+	svc := service.NewEventService(mockRepo, nil)
 	ctx := context.Background()
 
 	req := entity.CreateEventRequest{
@@ -151,7 +167,7 @@ func TestCreateEvent_EmptyName(t *testing.T) {
 
 func TestCreateEvent_InvalidTimeRange(t *testing.T) {
 	mockRepo := NewMockEventRepository()
-	svc := service.NewEventService(mockRepo)
+	svc := service.NewEventService(mockRepo, nil)
 	ctx := context.Background()
 
 	startTime := time.Now().Add(25 * time.Hour)
@@ -179,7 +195,7 @@ func TestCreateEvent_InvalidTimeRange(t *testing.T) {
 
 func TestCreateEvent_DuplicateSlug(t *testing.T) {
 	mockRepo := NewMockEventRepository()
-	svc := service.NewEventService(mockRepo)
+	svc := service.NewEventService(mockRepo, nil)
 	ctx := context.Background()
 
 	req1 := entity.CreateEventRequest{
@@ -218,7 +234,7 @@ func TestCreateEvent_DuplicateSlug(t *testing.T) {
 
 func TestCreateEventWithTickets_Success(t *testing.T) {
 	mockRepo := NewMockEventRepository()
-	svc := service.NewEventService(mockRepo)
+	svc := service.NewEventService(mockRepo, nil)
 	ctx := context.Background()
 
 	eventReq := entity.CreateEventRequest{
@@ -302,7 +318,7 @@ func TestCreateEventWithTickets_Success(t *testing.T) {
 
 func TestCreateEventWithTickets_InvalidTicketPrice(t *testing.T) {
 	mockRepo := NewMockEventRepository()
-	svc := service.NewEventService(mockRepo)
+	svc := service.NewEventService(mockRepo, nil)
 	ctx := context.Background()
 
 	eventReq := entity.CreateEventRequest{
@@ -335,7 +351,7 @@ func TestCreateEventWithTickets_InvalidTicketPrice(t *testing.T) {
 
 func TestCreateEventWithTickets_InvalidTicketQuantity(t *testing.T) {
 	mockRepo := NewMockEventRepository()
-	svc := service.NewEventService(mockRepo)
+	svc := service.NewEventService(mockRepo, nil)
 	ctx := context.Background()
 
 	eventReq := entity.CreateEventRequest{
@@ -368,7 +384,7 @@ func TestCreateEventWithTickets_InvalidTicketQuantity(t *testing.T) {
 
 func TestGetEvent_Success(t *testing.T) {
 	mockRepo := NewMockEventRepository()
-	svc := service.NewEventService(mockRepo)
+	svc := service.NewEventService(mockRepo, nil)
 	ctx := context.Background()
 
 	// Create event first
@@ -397,7 +413,7 @@ func TestGetEvent_Success(t *testing.T) {
 
 func TestGetEventBySlug_Success(t *testing.T) {
 	mockRepo := NewMockEventRepository()
-	svc := service.NewEventService(mockRepo)
+	svc := service.NewEventService(mockRepo, nil)
 	ctx := context.Background()
 
 	// Create event first
@@ -430,7 +446,7 @@ func TestGetEventBySlug_Success(t *testing.T) {
 
 func TestListEvents(t *testing.T) {
 	mockRepo := NewMockEventRepository()
-	svc := service.NewEventService(mockRepo)
+	svc := service.NewEventService(mockRepo, nil)
 	ctx := context.Background()
 
 	// Create multiple events

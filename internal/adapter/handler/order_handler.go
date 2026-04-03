@@ -222,3 +222,73 @@ func (h *OrderHandler) CancelOrder(c *fiber.Ctx) error {
 		"message": "order cancelled successfully",
 	})
 }
+
+// ListAdminOrders godoc
+// @Summary Get all orders for admin
+// @Tags Order (Admin)
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page number"
+// @Param limit query int false "Items per page"
+// @Param status query string false "Order Status"
+// @Param event_id query string false "Event ID"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/admin/orders [get]
+func (h *OrderHandler) ListAdminOrders(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
+	status := c.Query("status", "")
+	eventID := c.Query("event_id", "")
+
+	orders, total, err := h.orderService.ListAdminOrders(ctx, page, limit, status, eventID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"data":  orders,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
+}
+
+// UpdateOrderStatus godoc
+// @Summary Update Order Status (Admin)
+// @Tags Order (Admin)
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Order ID"
+// @Param payload body entity.UpdateOrderStatusRequest true "Order Status Payload"
+// @Success 200 {object} map[string]string
+// @Router /api/v1/admin/orders/{id}/status [put]
+func (h *OrderHandler) UpdateOrderStatus(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	orderIDStr := c.Params("id")
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID đơn hàng không hợp lệ"})
+	}
+
+	var req entity.UpdateOrderStatusRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu trạng thái không hợp lệ"})
+	}
+
+	err = h.orderService.UpdateOrderStatusAdmin(ctx, orderID, req.Status)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Cập nhật trạng thái đơn hàng thành công",
+	})
+}
+

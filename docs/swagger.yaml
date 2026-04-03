@@ -1,5 +1,112 @@
 basePath: /api/v1
 definitions:
+  entity.CreateEventRequest:
+    properties:
+      banner_url:
+        type: string
+      end_time:
+        type: string
+      location:
+        minLength: 3
+        type: string
+      name:
+        minLength: 3
+        type: string
+      slug:
+        minLength: 3
+        type: string
+      start_time:
+        type: string
+    required:
+    - end_time
+    - location
+    - name
+    - slug
+    - start_time
+    type: object
+  entity.CreateEventWithTicketsRequest:
+    properties:
+      event:
+        $ref: '#/definitions/entity.CreateEventRequest'
+      ticket_types:
+        items:
+          $ref: '#/definitions/entity.CreateTicketTypeRequest'
+        type: array
+    type: object
+  entity.CreateTicketTypeRequest:
+    properties:
+      initial_quantity:
+        minimum: 1
+        type: integer
+      name:
+        minLength: 3
+        type: string
+      price:
+        type: number
+    required:
+    - initial_quantity
+    - name
+    - price
+    type: object
+  entity.DashboardStatsResponse:
+    properties:
+      total_orders:
+        type: integer
+      total_revenue:
+        type: number
+      total_tickets_sold:
+        type: integer
+    type: object
+  entity.Event:
+    properties:
+      banner_url:
+        type: string
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      end_time:
+        type: string
+      id:
+        type: string
+      location:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+      start_time:
+        type: string
+      status:
+        $ref: '#/definitions/entity.EventStatus'
+      updated_at:
+        type: string
+    type: object
+  entity.EventStatistics:
+    properties:
+      cancelled:
+        type: integer
+      draft:
+        type: integer
+      ended:
+        type: integer
+      published:
+        type: integer
+      total:
+        type: integer
+    type: object
+  entity.EventStatus:
+    enum:
+    - DRAFT
+    - PUBLISHED
+    - CANCELLED
+    - ENDED
+    type: string
+    x-enum-varnames:
+    - EventStatusDraft
+    - EventStatusPublished
+    - EventStatusCancelled
+    - EventStatusEnded
   entity.LoginRequest:
     properties:
       email:
@@ -56,16 +163,70 @@ definitions:
     properties:
       email:
         type: string
+      full_name:
+        type: string
       password:
         minLength: 6
         type: string
       username:
-        minLength: 3
         type: string
     required:
     - email
     - password
-    - username
+    type: object
+  entity.TicketType:
+    properties:
+      event_id:
+        type: string
+      id:
+        type: string
+      initial_quantity:
+        type: integer
+      name:
+        type: string
+      price:
+        type: number
+      remaining_quantity:
+        type: integer
+    type: object
+  entity.UpdateEventRequest:
+    properties:
+      banner_url:
+        type: string
+      end_time:
+        type: string
+      location:
+        type: string
+      name:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+    type: object
+  entity.UpdateOrderStatusRequest:
+    properties:
+      status:
+        enum:
+        - PAID
+        - CANCELLED
+        type: string
+    required:
+    - status
+    type: object
+  entity.UpdateTicketTypeRequest:
+    properties:
+      price:
+        type: number
+      quantity:
+        type: integer
+    type: object
+  entity.UpdateUserStatusRequest:
+    properties:
+      is_active:
+        type: boolean
+    required:
+    - is_active
     type: object
   entity.User:
     properties:
@@ -75,6 +236,8 @@ definitions:
         type: string
       id:
         type: string
+      is_active:
+        type: boolean
       profile_data:
         additionalProperties: true
         type: object
@@ -106,6 +269,462 @@ info:
   title: Ticketing System API
   version: "1.0"
 paths:
+  /api/v1/admin/events/{id}/ticket-types:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Ticket Type Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/entity.CreateTicketTypeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.TicketType'
+      security:
+      - BearerAuth: []
+      summary: Add a new ticket type to an event
+      tags:
+      - Event (Admin)
+  /api/v1/admin/orders:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Order Status
+        in: query
+        name: status
+        type: string
+      - description: Event ID
+        in: query
+        name: event_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get all orders for admin
+      tags:
+      - Order (Admin)
+  /api/v1/admin/orders/{id}/status:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Order Status Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/entity.UpdateOrderStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update Order Status (Admin)
+      tags:
+      - Order (Admin)
+  /api/v1/admin/statistics/dashboard:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.DashboardStatsResponse'
+      security:
+      - BearerAuth: []
+      summary: Xem các con số thống kê Dashboard chính (Sử dụng vòng lặp Go cơ bản)
+      tags:
+      - Admin Statistics
+  /api/v1/admin/statistics/events:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/entity.EventStatistics'
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get event statistics (admin only)
+      tags:
+      - Statistics
+  /api/v1/admin/ticket-types/{ticket_id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Ticket Type ID
+        in: path
+        name: ticket_id
+        required: true
+        type: string
+      - description: Update Ticket Type Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/entity.UpdateTicketTypeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.TicketType'
+      security:
+      - BearerAuth: []
+      summary: Update an existing ticket type (Price, Quantity)
+      tags:
+      - Event (Admin)
+  /api/v1/admin/users:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all users (Admin)
+      tags:
+      - Admin User Management
+  /api/v1/admin/users/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User Status Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/entity.UpdateUserStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Ban/Unban user (Admin)
+      tags:
+      - Admin User Management
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/entity.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns JWT Token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login user
+      tags:
+      - Auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Register Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/entity.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.User'
+      summary: Register new user
+      tags:
+      - Auth
+  /api/v1/events:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - default: 10
+        description: Limit
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List all events
+      tags:
+      - Event
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Event Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/entity.CreateEventRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Event'
+      security:
+      - BearerAuth: []
+      summary: Create a new event
+      tags:
+      - Event
+  /api/v1/events/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete an event
+      tags:
+      - Event
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Event'
+      summary: Get event by ID
+      tags:
+      - Event
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/entity.UpdateEventRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Event'
+      security:
+      - BearerAuth: []
+      summary: Update an existing event
+      tags:
+      - Event
+  /api/v1/events/search:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Search query
+        in: query
+        name: search
+        type: string
+      - description: Status filter
+        in: query
+        name: status
+        type: string
+      - description: From time
+        in: query
+        name: from_time
+        type: string
+      - description: To time
+        in: query
+        name: to_time
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Search events with filters
+      tags:
+      - Event
+  /api/v1/events/slug/{slug}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Event Slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Event'
+      summary: Get event by slug
+      tags:
+      - Event
+  /api/v1/events/with-tickets:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Event with Tickets Payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/entity.CreateEventWithTicketsRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new event with ticket types
+      tags:
+      - Event
   /api/v1/orders:
     get:
       consumes:
@@ -232,48 +851,4 @@ paths:
       summary: Get user's orders
       tags:
       - Order
-  /auth/login:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Login Payload
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/entity.LoginRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Returns JWT Token
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Login user
-      tags:
-      - Auth
-  /auth/register:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Register Payload
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/entity.RegisterRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/entity.User'
-      summary: Register new user
-      tags:
-      - Auth
 swagger: "2.0"

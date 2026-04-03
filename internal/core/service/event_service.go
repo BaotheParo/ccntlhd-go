@@ -12,11 +12,13 @@ import (
 
 type eventService struct {
 	eventRepo port.EventRepositoryPort
+	cacheRepo port.TicketCacheRepository
 }
 
-func NewEventService(eventRepo port.EventRepositoryPort) port.EventServicePort {
+func NewEventService(eventRepo port.EventRepositoryPort, cacheRepo port.TicketCacheRepository) port.EventServicePort {
 	return &eventService{
 		eventRepo: eventRepo,
+		cacheRepo: cacheRepo,
 	}
 }
 
@@ -230,4 +232,103 @@ func (s *eventService) DeleteEvent(ctx context.Context, id uuid.UUID) error {
 		return errors.New("Không tìm thấy id này")
 	}
 	return s.eventRepo.DeleteEvent(ctx, id)
+}
+
+func (s *eventService) CreateTicketType(ctx context.Context, eventID uuid.UUID, req entity.CreateTicketTypeRequest) (*entity.TicketType, error) {
+	if err := validateCreateTicketTypeRequest(req); err != nil {
+		return nil, err
+	}
+
+	// 1. Kiểm tra sự kiện có tồn tại không
+	_, err := s.eventRepo.GetEventByID(ctx, eventID)
+	if err != nil {
+		return nil, errors.New("sự kiện không tồn tại")
+	}
+
+	// 2. Tạo đối tượng TicketType mới
+	ticketType := &entity.TicketType{
+		ID:                uuid.New(),
+		EventID:           eventID,
+		Name:              req.Name,
+		Price:             req.Price,
+		InitialQuantity:   req.InitialQuantity,
+		RemainingQuantity: req.InitialQuantity,
+	}
+
+	// 3. Lưu vào Database (PostgreSQL)
+	if err := s.eventRepo.CreateTicketType(ctx, ticketType); err != nil {
+		return nil, errors.New("lỗi khi lưu hạng vé vào cơ sở dữ liệu")
+	}
+
+	// 4. Đồng bộ số lượng vé lên Redis để phục vụ mua vé nhanh (Flash Sale)
+	if s.cacheRepo != nil {
+		err = s.cacheRepo.SetStock(ctx, ticketType.ID, ticketType.InitialQuantity)
+		if err != nil {
+			// Lưu ý: Lỗi Redis ở đây không làm hỏng dữ liệu PostgreSQL, nhưng nên cảnh báo
+			return ticketType, errors.New("tạo vé thành công nhưng lỗi đẩy lên Redis: " + err.Error())
+		}
+	}
+
+	return ticketType, nil
+}
+
+func (s *eventService) UpdateTicketType(ctx context.Context, ticketID uuid.UUID, req entity.UpdateTicketTypeRequest) (*entity.TicketType, error) {
+	// B1: Lấy thông tin hạng vé cũ từ Database ra
+	ticketType, err := s.eventRepo.GetTicketTypeByID(ctx, ticketID)
+	if err != nil {
+		return nil, errors.New("hạng vé không tồn tại")
+	}
+
+	// B2: Cập nhật Giá vé nếu có truyền lên (lớn hơn 0)
+	if req.Price.GreaterThan(req.Price.Sub(req.Price)) { // Cách an toàn kiểm tra lớn hơn 0
+		ticketType.Price = req.Price
+	}
+
+	// Xử lý Cập nhật Số lượng vé
+	if req.Quantity > 0 {
+		oldQuantity := ticketType.InitialQuantity
+		
+		// Luật nghiệp vụ: Không được phép giảm số lượng vé đã phát hành
+		if req.Quantity < oldQuantity {
+			return nil, errors.New("chỉ được phép tăng số lượng vé, không được giảm")
+		}
+
+		// Nếu số lượng mới lớn hơn số lượng cũ -> Xử lý tăng thêm
+		if req.Quantity > oldQuantity {
+			// B3: Tính phần số lượng vé chênh lệch (tăng thêm)
+			diff := req.Quantity - oldQuantity
+			
+			// B4: Cập nhật lại số liệu vào biến để chuẩn bị lưu DB
+			ticketType.InitialQuantity = req.Quantity
+			ticketType.RemainingQuantity = ticketType.RemainingQuantity + diff
+			
+			// Cập nhật Database
+			if err := s.eventRepo.UpdateTicketType(ctx, ticketType); err != nil {
+				return nil, errors.New("lỗi khi cập nhật hạng vé vào cơ sở dữ liệu")
+			}
+
+			// B5: Cập nhật Redis: Gọi SetStock hoặc hàm tăng. Ở đây để an toàn ta sẽ tính số lượng cộng thêm
+			// hoặc gọi SetStock đè lại số RemainingQuantity mới nhất.
+			// Tuy nhỏ, nhưng nếu ta dùng cách set mới thì an toàn hơn cho sinh viên dễ hiểu:
+			if s.cacheRepo != nil {
+				// Mẹo an toàn: Ta đẩy số tồn kho hiện tại lên lại Redis (Đây là cách xử lý đơn giản nhất)
+				err = s.cacheRepo.SetStock(ctx, ticketType.ID, ticketType.RemainingQuantity)
+				if err != nil {
+					return ticketType, errors.New("cập nhật vé thành công nhưng lỗi đồng bộ Redis: " + err.Error())
+				}
+			}
+		} else {
+			// Chỉ đổi giá, không đổi số lượng -> Lưu lại bình thường
+			if err := s.eventRepo.UpdateTicketType(ctx, ticketType); err != nil {
+				return nil, errors.New("lỗi khi cập nhật giá vé")
+			}
+		}
+	} else {
+		// Chỉ đổi giá, không đổi số lượng (Quantity = 0)
+		if err := s.eventRepo.UpdateTicketType(ctx, ticketType); err != nil {
+			return nil, errors.New("lỗi khi cập nhật giá vé")
+		}
+	}
+
+	return ticketType, nil
 }

@@ -4,11 +4,12 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/yourname/ticketing-system/internal/core/port"
 	"github.com/yourname/ticketing-system/pkg/auth"
 )
 
-// AuthMiddleware nhận vào secret key để giải mã JWT
-func AuthMiddleware(secret string) fiber.Handler {
+// AuthMiddleware nhận vào secret key để giải mã JWT và kết nối Repository để check trạng thái
+func AuthMiddleware(secret string, userRepo port.UserRepositoryPort) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// 1. Lấy giá trị từ Header Authorization
 		// Thông thường có dạng: Bearer <chuỗi_token>
@@ -37,7 +38,21 @@ func AuthMiddleware(secret string) fiber.Handler {
 			})
 		}
 
-		// 3. "Đánh dấu" thông tin User vào Request
+		// 3. (BẢO MẬT) Check DB trực tiếp ở Middleware để đảm bảo Real-time Ban (Khóa là văng ngay lập tức)
+		// Lý do: Nếu chỉ check JWT, user bị khóa vẫn xài được đến khi token hết hạn.
+		user, err := userRepo.GetUserByID(c.Context(), claims.UserID)
+		if err != nil || user == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Tài khoản không tồn tại",
+			})
+		}
+		if !user.IsActive {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin",
+			})
+		}
+
+		// 4. "Đánh dấu" thông tin User vào Request
 		// c.Locals giúp truyền dữ liệu từ Middleware vào Handler chính
 		c.Locals("user_id", claims.UserID)
 		c.Locals("role", claims.Role)

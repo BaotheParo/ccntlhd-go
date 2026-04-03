@@ -209,3 +209,61 @@ func (s *OrderService) Shutdown() error {
 	log.Println("Tất cả worker đã dừng hoàn toàn")
 	return nil
 }
+
+// Lấy danh sách toàn bộ đơn hàng (Dành cho Admin)
+func (s *OrderService) ListAdminOrders(ctx context.Context, page, limit int, status string, eventID string) ([]entity.Order, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+	return s.repo.ListOrdersAdvanced(ctx, page, limit, status, eventID)
+}
+
+// Cập nhật trạng thái đơn hàng và xử lý nghiệp vụ Rollback (Dành cho Admin)
+func (s *OrderService) UpdateOrderStatusAdmin(ctx context.Context, orderID uuid.UUID, newStatus string) error {
+	// B1: Fetch Order từ DB (bao gồm thông tin các vé đã đặt - Preload Items)
+	order, err := s.repo.GetOrderByID(ctx, orderID)
+	if err != nil {
+		return errors.New("không tìm thấy đơn hàng")
+	}
+
+	// B2: Kiểm tra trạng thái hiện tại. Không cho phép đổi nếu đã chốt.
+	if order.Status == entity.OrderStatusPaid || order.Status == entity.OrderStatusCancelled {
+		return errors.New("đơn hàng đã chốt, không thể thay đổi trạng thái")
+	}
+
+	statusEnum := entity.OrderStatus(newStatus)
+
+	// B3: Xử lý nhánh PAID
+	if statusEnum == entity.OrderStatusPaid {
+		return s.repo.UpdateOrderStatus(ctx, orderID, entity.OrderStatusPaid)
+	}
+
+	// B4: Xử lý nhánh CANCELLED
+	if statusEnum == entity.OrderStatusCancelled {
+		// Cập nhật trạng thái trong Database trước
+		if err := s.repo.UpdateOrderStatus(ctx, orderID, entity.OrderStatusCancelled); err != nil {
+			return err
+		}
+
+		// BẮT BUỘC: Rollback vé về Redis
+		// Giải thích: Redis đóng vai trò gatekeeper (người giữ cổng) chặn Flash Sale.
+		// Số lượng trong Redis luôn trừ trước, nếu đơn bị Admin HỦY (CANCELLED), 
+		// vé phải được cộng ngược lại ngay lập tức vào Redis để người khác có thể mua tiếp.
+		// Nếu bỏ quên vòng lặp này, vé sẽ "bốc hơi" vĩnh viễn khỏi kho Redis dù thực tế không ai mua thành công.
+		if s.cacheRepo != nil {
+			for _, item := range order.Items {
+				err := s.cacheRepo.RollbackStock(ctx, item.TicketTypeID, item.Quantity)
+				if err != nil {
+					// Log ra cảnh báo nhưng không để sập giao dịch DB
+					log.Printf("⚠️ Lỗi khi rollback vé ID %s trên Redis cho đơn %s: %v", item.TicketTypeID, orderID, err)
+				}
+			}
+		}
+		return nil
+	}
+
+	return errors.New("trạng thái cập nhật không hợp lệ (chỉ nhận PAID hoặc CANCELLED)")
+}

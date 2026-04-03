@@ -29,6 +29,14 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
 
+	// Thêm thủ công cột deleted_at để tránh dính lỗi constraint của AutoMigrate
+	if !db.Migrator().HasColumn(&entity.Event{}, "DeletedAt") {
+		_ = db.Migrator().AddColumn(&entity.Event{}, "DeletedAt")
+	}
+	if !db.Migrator().HasColumn(&entity.TicketType{}, "DeletedAt") {
+		_ = db.Migrator().AddColumn(&entity.TicketType{}, "DeletedAt")
+	}
+
 	return db
 }
 
@@ -43,7 +51,7 @@ func cleanupEvents(t *testing.T, db *gorm.DB, slugs ...string) {
 func TestCreateEvent_DB_Success(t *testing.T) {
 	db := setupTestDB(t)
 	eventRepo := repository.NewEventRepository(db)
-	svc := service.NewEventService(eventRepo)
+	svc := service.NewEventService(eventRepo, nil)
 	ctx := context.Background()
 
 	slug := fmt.Sprintf("concert-db-success-%d", time.Now().UnixNano())
@@ -93,7 +101,7 @@ func TestCreateEvent_DB_Success(t *testing.T) {
 func TestCreateEventWithTickets_DB_Success(t *testing.T) {
 	db := setupTestDB(t)
 	eventRepo := repository.NewEventRepository(db)
-	svc := service.NewEventService(eventRepo)
+	svc := service.NewEventService(eventRepo, nil)
 	ctx := context.Background()
 
 	slug := fmt.Sprintf("festival-db-success-%d", time.Now().UnixNano())
@@ -190,7 +198,7 @@ func TestCreateEventWithTickets_DB_Success(t *testing.T) {
 func TestGetEventBySlug_DB(t *testing.T) {
 	db := setupTestDB(t)
 	eventRepo := repository.NewEventRepository(db)
-	svc := service.NewEventService(eventRepo)
+	svc := service.NewEventService(eventRepo, nil)
 	ctx := context.Background()
 
 	slug := fmt.Sprintf("cinema-night-%d", time.Now().UnixNano())
@@ -230,7 +238,7 @@ func TestGetEventBySlug_DB(t *testing.T) {
 func TestListEvents_DB(t *testing.T) {
 	db := setupTestDB(t)
 	eventRepo := repository.NewEventRepository(db)
-	svc := service.NewEventService(eventRepo)
+	svc := service.NewEventService(eventRepo, nil)
 	ctx := context.Background()
 
 	// Create 3 events
@@ -285,7 +293,7 @@ func TestListEvents_DB(t *testing.T) {
 func TestCreateEvent_DB_DuplicateSlug(t *testing.T) {
 	db := setupTestDB(t)
 	eventRepo := repository.NewEventRepository(db)
-	svc := service.NewEventService(eventRepo)
+	svc := service.NewEventService(eventRepo, nil)
 	ctx := context.Background()
 
 	slug := fmt.Sprintf("duplicate-slug-%d", time.Now().UnixNano())

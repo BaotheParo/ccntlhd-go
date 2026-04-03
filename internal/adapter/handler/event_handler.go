@@ -15,6 +15,15 @@ func NewEventHandler(svc port.EventServicePort) *EventHandler {
 	return &EventHandler{svc: svc}
 }
 
+// CreateEvent godoc
+// @Summary Create a new event
+// @Tags Event
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param payload body entity.CreateEventRequest true "Event Payload"
+// @Success 201 {object} entity.Event
+// @Router /api/v1/events [post]
 func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 	var req entity.CreateEventRequest
 
@@ -34,6 +43,15 @@ func (h *EventHandler) CreateEvent(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(event)
 }
 
+// CreateEventWithTickets godoc
+// @Summary Create a new event with ticket types
+// @Tags Event
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param payload body entity.CreateEventWithTicketsRequest true "Event with Tickets Payload"
+// @Success 201 {object} map[string]interface{}
+// @Router /api/v1/events/with-tickets [post]
 func (h *EventHandler) CreateEventWithTickets(c *fiber.Ctx) error {
 	var req entity.CreateEventWithTicketsRequest
 
@@ -63,6 +81,14 @@ func (h *EventHandler) CreateEventWithTickets(c *fiber.Ctx) error {
 	})
 }
 
+// GetEvent godoc
+// @Summary Get event by ID
+// @Tags Event
+// @Accept json
+// @Produce json
+// @Param id path string true "Event ID"
+// @Success 200 {object} entity.Event
+// @Router /api/v1/events/{id} [get]
 func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -84,6 +110,14 @@ func (h *EventHandler) GetEvent(c *fiber.Ctx) error {
 	return c.JSON(event)
 }
 
+// GetEventBySlug godoc
+// @Summary Get event by slug
+// @Tags Event
+// @Accept json
+// @Produce json
+// @Param slug path string true "Event Slug"
+// @Success 200 {object} entity.Event
+// @Router /api/v1/events/slug/{slug} [get]
 func (h *EventHandler) GetEventBySlug(c *fiber.Ctx) error {
 	slug := c.Params("slug")
 
@@ -97,6 +131,15 @@ func (h *EventHandler) GetEventBySlug(c *fiber.Ctx) error {
 	return c.JSON(event)
 }
 
+// ListEvents godoc
+// @Summary List all events
+// @Tags Event
+// @Accept json
+// @Produce json
+// @Param limit query int false "Limit" default(10)
+// @Param offset query int false "Offset" default(0)
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/events [get]
 func (h *EventHandler) ListEvents(c *fiber.Ctx) error {
 	limit := c.QueryInt("limit", 10)
 	offset := c.QueryInt("offset", 0)
@@ -115,6 +158,19 @@ func (h *EventHandler) ListEvents(c *fiber.Ctx) error {
 	})
 }
 
+// ListEventsAdvanced godoc
+// @Summary Search events with filters
+// @Tags Event
+// @Accept json
+// @Produce json
+// @Param page query int false "Page"
+// @Param limit query int false "Limit"
+// @Param search query string false "Search query"
+// @Param status query string false "Status filter"
+// @Param from_time query string false "From time"
+// @Param to_time query string false "To time"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/events/search [get]
 func (h *EventHandler) ListEventsAdvanced(c *fiber.Ctx) error {
 	var req entity.ListEventRequest
 	if err := c.QueryParser(&req); err != nil {
@@ -149,6 +205,16 @@ func (h *EventHandler) ListEventsAdvanced(c *fiber.Ctx) error {
 	})
 }
 
+// UpdateEvent godoc
+// @Summary Update an existing event
+// @Tags Event
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Event ID"
+// @Param payload body entity.UpdateEventRequest true "Update Payload"
+// @Success 200 {object} entity.Event
+// @Router /api/v1/events/{id} [put]
 func (h *EventHandler) UpdateEvent(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -169,6 +235,15 @@ func (h *EventHandler) UpdateEvent(c *fiber.Ctx) error {
 	return c.JSON(event)
 }
 
+// DeleteEvent godoc
+// @Summary Delete an event
+// @Tags Event
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Event ID"
+// @Success 200 {object} map[string]string
+// @Router /api/v1/events/{id} [delete]
 func (h *EventHandler) DeleteEvent(c *fiber.Ctx) error {
 	id := c.Params("id")
 	eventID, err := uuid.Parse(id)
@@ -181,3 +256,65 @@ func (h *EventHandler) DeleteEvent(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"message": "Xóa thành công"})
 }
+
+// CreateTicketType godoc
+// @Summary Add a new ticket type to an event
+// @Tags Event (Admin)
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Event ID"
+// @Param payload body entity.CreateTicketTypeRequest true "Ticket Type Payload"
+// @Success 201 {object} entity.TicketType
+// @Router /api/v1/admin/events/{id}/ticket-types [post]
+func (h *EventHandler) CreateTicketType(c *fiber.Ctx) error {
+	id := c.Params("id")
+	eventID, err := uuid.Parse(id)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID sự kiện không hợp lệ"})
+	}
+
+	var req entity.CreateTicketTypeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu vé gửi lên không hợp lệ"})
+	}
+
+	ticketType, err := h.svc.CreateTicketType(c.Context(), eventID, req)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(ticketType)
+}
+
+// UpdateTicketType godoc
+// @Summary Update an existing ticket type (Price, Quantity)
+// @Tags Event (Admin)
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param ticket_id path string true "Ticket Type ID"
+// @Param payload body entity.UpdateTicketTypeRequest true "Update Ticket Type Payload"
+// @Success 200 {object} entity.TicketType
+// @Router /api/v1/admin/ticket-types/{ticket_id} [put]
+func (h *EventHandler) UpdateTicketType(c *fiber.Ctx) error {
+	ticketIDStr := c.Params("ticket_id")
+	ticketID, err := uuid.Parse(ticketIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID hạng vé không hợp lệ"})
+	}
+
+	var req entity.UpdateTicketTypeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu cập nhật vé không hợp lệ"})
+	}
+
+	ticketType, err := h.svc.UpdateTicketType(c.Context(), ticketID, req)
+	if err != nil {
+		// Báo lỗi 400 rõ ràng khi sinh viên test thử giảm số lượng hoặc cập nhật lỗi
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(ticketType)
+}
+

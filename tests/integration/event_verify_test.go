@@ -16,7 +16,7 @@ import (
 func TestCheckDataInDatabase(t *testing.T) {
 	db := setupTestDB(t)
 	eventRepo := repository.NewEventRepository(db)
-	svc := service.NewEventService(eventRepo)
+	svc := service.NewEventService(eventRepo, nil)
 	ctx := context.Background()
 
 	slug := fmt.Sprintf("verify-data-%d", time.Now().UnixNano())

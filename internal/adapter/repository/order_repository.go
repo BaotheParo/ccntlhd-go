@@ -69,6 +69,46 @@ func (r *orderRepository) GetOrdersByUserID(ctx context.Context, userID uuid.UUI
 	return orders, err
 }
 
+func (r *orderRepository) ListOrdersAdvanced(ctx context.Context, page, limit int, status string, eventID string) ([]entity.Order, int64, error) {
+	var orders []entity.Order
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&entity.Order{})
+
+	// Lọc theo Status nếu có
+	if status != "" {
+		query = query.Where("orders.status = ?", status)
+	}
+
+	// Lọc theo EventID qua bảng trung gian (Hơi nâng cao nhưng GORM lo được)
+	if eventID != "" {
+		query = query.Joins("JOIN order_items ON order_items.order_id = orders.id").
+			Joins("JOIN ticket_types ON ticket_types.id = order_items.ticket_type_id").
+			Where("ticket_types.event_id = ?", eventID).
+			Distinct("orders.id") // Dùng Distinct thay cho Group by để đếm dễ hơn
+	}
+
+	// Đếm tổng số đơn thỏa mãn
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Tính toán phân trang
+	offset := (page - 1) * limit
+	if offset < 0 {
+		offset = 0
+	}
+
+	// Lấy dữ liệu và Preload Items (để biết họ mua vé gì)
+	err := query.Preload("Items").
+		Limit(limit).
+		Offset(offset).
+		Order("orders.created_at DESC").
+		Find(&orders).Error
+
+	return orders, total, err
+}
+
 func (r *orderRepository) UpdateOrderStatus(ctx context.Context, id uuid.UUID, status entity.OrderStatus) error {
 	return r.db.WithContext(ctx).
 		Model(&entity.Order{}).

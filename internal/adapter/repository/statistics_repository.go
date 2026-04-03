@@ -56,3 +56,17 @@ func (r *statisticsRepository) GetEventStatistics(ctx context.Context) (entity.E
 
 	return stats, nil
 }
+
+// GetAllPaidOrders lấy toàn bộ đơn hàng đã thanh toán (PAID) kèm theo chi tiết vé (Items)
+func (r *statisticsRepository) GetAllPaidOrders(ctx context.Context) ([]entity.Order, error) {
+	var orders []entity.Order
+
+	// Chỉ lấy đơn hàng có trạng thái PAID
+	// Preload("Items") để lấy danh sách vé mua bên trong từng đơn hàng
+	err := r.db.WithContext(ctx).
+		Preload("Items").
+		Where("status = ?", "PAID").
+		Find(&orders).Error
+
+	return orders, err
+}

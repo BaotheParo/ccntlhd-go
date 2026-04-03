@@ -74,6 +74,19 @@ func (r *eventRepository) CreateTicketTypes(ctx context.Context, ticketTypes []e
 	return r.db.WithContext(ctx).Create(ticketTypes).Error
 }
 
+func (r *eventRepository) GetTicketTypeByID(ctx context.Context, id uuid.UUID) (*entity.TicketType, error) {
+	var ticketType entity.TicketType
+	err := r.db.WithContext(ctx).First(&ticketType, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &ticketType, nil
+}
+
+func (r *eventRepository) UpdateTicketType(ctx context.Context, ticketType *entity.TicketType) error {
+	return r.db.WithContext(ctx).Save(ticketType).Error
+}
+
 func (r *eventRepository) ListEventsAdvanced(ctx context.Context, f entity.EventFilter) ([]entity.Event, int64, error) {
 	var events []entity.Event
 	var total int64
