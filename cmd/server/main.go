@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -30,19 +31,34 @@ import (
 // @host localhost:8080
 // @BasePath /api/v1
 func main() {
-	// 1. Cấu hình (Lấy từ Environment hoặc mặc định)
+	// 1. Tải cấu hình trước khi làm bất kỳ việc gì
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Không thể tải cấu hình: %v", err)
+	}
+
 	jwtSecret := getEnv("JWT_SECRET", "my-super-secret-key-2026")
+	
+	// Sử dụng cấu hình từ config.yaml (ưu tiên hơn giá trị mặc định)
+	dbHost := cfg.Database.Host
+	dbPort := fmt.Sprintf("%d", cfg.Database.Port)
+	if dbHost == "" {
+		dbHost = getEnv("DB_HOST", "localhost")
+	}
+	if dbPort == "0" {
+		dbPort = getEnv("DB_PORT", "5433")
+	}
+
 	dbConnStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		getEnv("DB_HOST", "postgres"),
-		getEnv("DB_PORT", "5432"),
-		getEnv("DB_USER", "user"),
-		getEnv("DB_PASS", "password"),
-		getEnv("DB_NAME", "ticket_db"),
+		dbHost,
+		dbPort,
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.DBName,
 	)
 
 	// 2. Kết nối Database với GORM
 	var db *gorm.DB
-	var err error
 
 	// Chờ DB sẵn sàng (Retry logic)
 	for i := 0; i < 5; i++ {
@@ -52,7 +68,7 @@ func main() {
 		if err == nil {
 			break
 		}
-		log.Printf("Đang đợi DB... (%d/5)", i+1)
+		log.Printf("Đang đợi DB... (%d/5) - Connect String: %s", i+1, dbConnStr)
 		time.Sleep(2 * time.Second)
 	}
 	if err != nil {
@@ -65,12 +81,6 @@ func main() {
 		log.Printf("⚠️ Lỗi Migrate Database: %v", err)
 	} else {
 		log.Println("✅ AutoMigrate Database successfully!")
-	}
-
-	// Tải cấu hình
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		log.Fatalf("Không thể tải cấu hình: %v", err)
 	}
 
 	// 3. Khởi tạo các lớp (Dependency Injection)
@@ -121,12 +131,19 @@ func main() {
 	handler.SetupRoutes(app, userRepo, authHandler, eventHandler, orderHandler, statisticsHandler, jwtSecret)
 
 	// 6. Chạy Server và cấu hình Graceful Shutdown
-	port := getEnv("SERVER_PORT", "8080")
+	port := cfg.Server.Port
+	if port == "" {
+		port = ":8080"
+	}
+	// Nếu port chỉ có số (như 8081) thì thêm dấu : vào trước
+	if !strings.HasPrefix(port, ":") {
+		port = ":" + port
+	}
 
 	// Khởi chạy server trong một goroutine
 	go func() {
 		log.Printf("Starting server on port %s", port)
-		if err := app.Listen(":" + port); err != nil && err != http.ErrServerClosed {
+		if err := app.Listen(port); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Lỗi server: %v", err)
 		}
 	}()

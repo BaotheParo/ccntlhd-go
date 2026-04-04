@@ -5,13 +5,13 @@ server:
 
 database:
   host: "localhost"
-  port: 5432
+  port: 5433
   user: "user"
   password: "password"
   dbname: "ticket_db"
   sslmode: "disable"
 
 redis:
-  addr: "localhost:6379"
+  addr: "localhost:6380"
   password: ""
   db: 0

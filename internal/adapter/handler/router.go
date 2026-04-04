@@ -62,6 +62,10 @@ func SetupRoutes(app *fiber.App, userRepo port.UserRepositoryPort, authHandler *
 	admin.Post("/events/:id/ticket-types", eventHandler.CreateTicketType)
 	admin.Put("/ticket-types/:ticket_id", eventHandler.UpdateTicketType)
 
+	// Admin User Routes
+	admin.Get("/users", authHandler.ListUsers)
+	admin.Patch("/users/:id/status", authHandler.UpdateUserStatus)
+
 	// Admin Order Routes
 	admin.Get("/orders", orderHandler.ListAdminOrders)
 	admin.Put("/orders/:id/status", orderHandler.UpdateOrderStatus)

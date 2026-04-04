@@ -1,3 +1,8 @@
 bin/
 .env
 .DS_Store
+frontend/
+tmp_server
+server.exe
+*.exe
+docs/
