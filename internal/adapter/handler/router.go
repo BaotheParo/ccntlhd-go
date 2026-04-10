@@ -44,7 +44,8 @@ func SetupRoutes(app *fiber.App, userRepo port.UserRepositoryPort, authHandler *
 	events.Get("/search", eventHandler.ListEventsAdvanced)
 	events.Get("/slug/:slug", eventHandler.GetEventBySlug) // Get event by slug
 	events.Get("/:id", eventHandler.GetEvent)              // Get event by ID
-	events.Get("", eventHandler.ListEvents)                // List all events
+	events.Get("", eventHandler.ListEvents)                // List all event
+	events.Get("/tickettype/:id", eventHandler.GetTicketTypeByIDEvent)
 
 	// Order routes
 	orders := api.Group("/orders", AuthMiddleware(jwtSecret, userRepo))
