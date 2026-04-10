@@ -21,7 +21,7 @@ func NewEventRepository(db *gorm.DB) port.EventRepositoryPort {
 func (r *eventRepository) CreateEvent(ctx context.Context, event *entity.Event) error {
 	// Bắt đầu Transaction bằng lệnh SQL thuần để log hiện ra chữ "BEGIN"
 	r.db.WithContext(ctx).Exec("BEGIN")
-	
+
 	err := r.db.WithContext(ctx).Create(event).Error
 	if err != nil {
 		r.db.WithContext(ctx).Exec("ROLLBACK")
@@ -119,4 +119,13 @@ func (r *eventRepository) ListEventsAdvanced(ctx context.Context, f entity.Event
 	}
 
 	return events, total, nil
+}
+
+func (r *eventRepository) GetAllTicketTypeByIDEvent(ctx context.Context, id uuid.UUID) ([]entity.TicketType, error) {
+	var ticketTypes []entity.TicketType
+	err := r.db.WithContext(ctx).Where("event_id = ?", id).Find(&ticketTypes).Error
+	if err != nil {
+		return nil, err
+	}
+	return ticketTypes, nil
 }
