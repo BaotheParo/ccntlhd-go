@@ -287,7 +287,7 @@ func (s *eventService) UpdateTicketType(ctx context.Context, ticketID uuid.UUID,
 	// Xử lý Cập nhật Số lượng vé
 	if req.Quantity > 0 {
 		oldQuantity := ticketType.InitialQuantity
-		
+
 		// Luật nghiệp vụ: Không được phép giảm số lượng vé đã phát hành
 		if req.Quantity < oldQuantity {
 			return nil, errors.New("chỉ được phép tăng số lượng vé, không được giảm")
@@ -297,11 +297,11 @@ func (s *eventService) UpdateTicketType(ctx context.Context, ticketID uuid.UUID,
 		if req.Quantity > oldQuantity {
 			// B3: Tính phần số lượng vé chênh lệch (tăng thêm)
 			diff := req.Quantity - oldQuantity
-			
+
 			// B4: Cập nhật lại số liệu vào biến để chuẩn bị lưu DB
 			ticketType.InitialQuantity = req.Quantity
 			ticketType.RemainingQuantity = ticketType.RemainingQuantity + diff
-			
+
 			// Cập nhật Database
 			if err := s.eventRepo.UpdateTicketType(ctx, ticketType); err != nil {
 				return nil, errors.New("lỗi khi cập nhật hạng vé vào cơ sở dữ liệu")

@@ -32,6 +32,10 @@ func ValidateToken(tokenString string, secret string) (*Claims, error) {
 		return []byte(secret), nil
 	})
 
+	if err != nil {
+		return nil, err
+	}
+
 	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
 		return claims, nil
 	}

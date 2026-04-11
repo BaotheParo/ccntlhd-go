@@ -39,15 +39,24 @@ func main() {
 
 	jwtSecret := getEnv("JWT_SECRET", "my-super-secret-key-2026")
 	
-	// Sử dụng cấu hình từ config.yaml (ưu tiên hơn giá trị mặc định)
-	dbHost := cfg.Database.Host
-	dbPort := fmt.Sprintf("%d", cfg.Database.Port)
+	// Sử dụng biến môi trường (ưu tiên cho Docker), nếu không có thì dùng config.yaml
+	dbHost := getEnv("DB_HOST", cfg.Database.Host)
+	dbPort := getEnv("DB_PORT", fmt.Sprintf("%d", cfg.Database.Port))
+	
 	if dbHost == "" {
-		dbHost = getEnv("DB_HOST", "localhost")
+		dbHost = "localhost"
 	}
-	if dbPort == "0" {
-		dbPort = getEnv("DB_PORT", "5433")
+	// Nếu chạy docker, port nội bộ là 5432. Nếu chạy local, thường là 5433
+	if dbPort == "0" || dbPort == "" {
+		dbPort = "5433"
 	}
+
+	// Cập nhật lại Redis Addr từ môi trường nếu có
+	redisAddr := getEnv("REDIS_ADDR", cfg.Redis.Addr)
+	if redisAddr == "" {
+		redisAddr = "localhost:6380"
+	}
+	cfg.Redis.Addr = redisAddr
 
 	dbConnStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		dbHost,

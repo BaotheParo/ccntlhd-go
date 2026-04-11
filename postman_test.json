@@ -1,0 +1,264 @@
+{
+    "info": {
+        "_postman_id": "4204d680-29e1-4bd9-94cf-8cec8f8912c3",
+        "name": "Ticketing System - Flash Sale Demo",
+        "description": "Collection phuc vu bao cao do an Ticketing System v1",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "01. Authentication",
+            "item": [
+                {
+                    "name": "Admin Login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"admin@example.com\",\n    \"password\": \"admin\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/auth/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "auth",
+                                "login"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "02. Admin APIs (Event & Dashboard)",
+            "item": [
+                {
+                    "name": "Create Event With Tickets",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{adminToken}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Sơn Tùng M-TP Concert 2026\",\n    \"slug\": \"mtp-2026\",\n    \"location\": \"SVĐ Mỹ Đình\",\n    \"start_time\": \"2026-12-30T20:00:00Z\",\n    \"end_time\": \"2026-12-30T23:59:59Z\",\n    \"ticket_types\": [\n        { \"name\": \"VIP\", \"price\": 500000, \"initial_quantity\": 100 },\n        { \"name\": \"Standard\", \"price\": 200000, \"initial_quantity\": 900 }\n    ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/events/with-tickets",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "events",
+                                "with-tickets"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Admin Dashboard Stats",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{adminToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/admin/statistics/dashboard",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "admin",
+                                "statistics",
+                                "dashboard"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "03. Real-time Ban Scenario",
+            "item": [
+                {
+                    "name": "Case 1: User access valid",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{userToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/orders",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "orders"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Case 2: Admin Ban User",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{adminToken}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"is_active\": false\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/admin/users/{{targetUserId}}/status",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "admin",
+                                "users",
+                                "{{targetUserId}}",
+                                "status"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Case 3: User Blocked (403)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{userToken}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/orders",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "orders"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "04. Flash Sale Flow",
+            "item": [
+                {
+                    "name": "Place Order (Success 202)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{userToken}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"ticket_type_id\": \"{{ticketId}}\",\n    \"quantity\": 2\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/orders",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "orders"
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8080",
+            "type": "string"
+        },
+        {
+            "key": "adminToken",
+            "value": "TOKEN_CUA_ADMIN_O_DAY",
+            "type": "string"
+        },
+        {
+            "key": "userToken",
+            "value": "TOKEN_CUA_USER_O_DAY",
+            "type": "string"
+        },
+        {
+            "key": "targetUserId",
+            "value": "ID_USER_CAN_KHOA",
+            "type": "string"
+        },
+        {
+            "key": "ticketId",
+            "value": "ID_HANG_VE",
+            "type": "string"
+        }
+    ]
+}
