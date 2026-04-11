@@ -19,6 +19,7 @@ type EventRepositoryPort interface {
 	CreateTicketTypes(ctx context.Context, ticketTypes []entity.TicketType) error
 	GetTicketTypeByID(ctx context.Context, id uuid.UUID) (*entity.TicketType, error)
 	UpdateTicketType(ctx context.Context, ticketType *entity.TicketType) error
+	GetAllTicketTypeByIDEvent(ctx context.Context, id uuid.UUID) ([]entity.TicketType, error)
 
 	ListEventsAdvanced(ctx context.Context, query entity.EventFilter) ([]entity.Event, int64, error)
 }
@@ -32,7 +33,9 @@ type EventServicePort interface {
 	DeleteEvent(ctx context.Context, id uuid.UUID) error
 	ListEvents(ctx context.Context, limit int, offset int) ([]entity.Event, error)
 	ListEventsAdvanced(ctx context.Context, req entity.ListEventRequest) ([]entity.Event, int64, error)
-	
+
+	GetAllTicketTypeByIDEvent(ctx context.Context, id uuid.UUID) ([]entity.TicketType, error)
+
 	CreateTicketType(ctx context.Context, eventID uuid.UUID, req entity.CreateTicketTypeRequest) (*entity.TicketType, error)
 	UpdateTicketType(ctx context.Context, ticketID uuid.UUID, req entity.UpdateTicketTypeRequest) (*entity.TicketType, error)
 }
