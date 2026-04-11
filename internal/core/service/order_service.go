@@ -250,15 +250,16 @@ func (s *OrderService) UpdateOrderStatusAdmin(ctx context.Context, orderID uuid.
 
 		// BẮT BUỘC: Rollback vé về Redis
 		// Giải thích: Redis đóng vai trò gatekeeper (người giữ cổng) chặn Flash Sale.
-		// Số lượng trong Redis luôn trừ trước, nếu đơn bị Admin HỦY (CANCELLED), 
+		// Số lượng trong Redis luôn trừ trước, nếu đơn bị Admin HỦY (CANCELLED),
 		// vé phải được cộng ngược lại ngay lập tức vào Redis để người khác có thể mua tiếp.
-		// Nếu bỏ quên vòng lặp này, vé sẽ "bốc hơi" vĩnh viễn khỏi kho Redis dù thực tế không ai mua thành công.
+		// Nếu bỏ quên vòng lặp này, vé sẽ "bốc hơi" vĩnh viễn khỏi kho Redis dù thực tế không
+		// ai mua thành công.
 		if s.cacheRepo != nil {
 			for _, item := range order.Items {
 				err := s.cacheRepo.RollbackStock(ctx, item.TicketTypeID, item.Quantity)
 				if err != nil {
 					// Log ra cảnh báo nhưng không để sập giao dịch DB
-					log.Printf("⚠️ Lỗi khi rollback vé ID %s trên Redis cho đơn %s: %v", item.TicketTypeID, orderID, err)
+					log.Printf("Loi khi rollback ve %s tren redis  %s: %v", item.TicketTypeID, orderID, err)
 				}
 			}
 		}
