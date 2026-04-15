@@ -37,42 +37,25 @@ func main() {
 	}
 
 	jwtSecret := getEnv("JWT_SECRET", "my-super-secret-key-2026")
-<<<<<<< HEAD
 
 	dbHost := getEnv("DB_HOST", cfg.Database.Host)
 	dbPort := getEnv("DB_PORT", fmt.Sprintf("%d", cfg.Database.Port))
 	dbUser := getEnv("DB_USER", cfg.Database.User)
 	dbPass := getEnv("DB_PASS", cfg.Database.Password)
 	dbName := getEnv("DB_NAME", cfg.Database.DBName)
-=======
-	
-	// Sử dụng biến môi trường (ưu tiên cho Docker), nếu không có thì dùng config.yaml
-	dbHost := getEnv("DB_HOST", cfg.Database.Host)
-	dbPort := getEnv("DB_PORT", fmt.Sprintf("%d", cfg.Database.Port))
-	
+
 	if dbHost == "" {
 		dbHost = "localhost"
 	}
-	// Nếu chạy docker, port nội bộ là 5432. Nếu chạy local, thường là 5433
 	if dbPort == "0" || dbPort == "" {
 		dbPort = "5433"
 	}
 
-	// Cập nhật lại Redis Addr từ môi trường nếu có
 	redisAddr := getEnv("REDIS_ADDR", cfg.Redis.Addr)
 	if redisAddr == "" {
 		redisAddr = "localhost:6380"
 	}
 	cfg.Redis.Addr = redisAddr
-
-	dbConnStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		dbHost,
-		dbPort,
-		cfg.Database.User,
-		cfg.Database.Password,
-		cfg.Database.DBName,
-	)
->>>>>>> f11d23530d61c6e1b38bebf86b95cc1ba90b0995
 
 	dbTargets := buildDBTargets(dbHost, dbPort, fmt.Sprintf("%d", cfg.Database.Port))
 	db, err := connectDatabase(dbTargets, dbUser, dbPass, dbName)
