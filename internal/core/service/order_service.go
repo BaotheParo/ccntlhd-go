@@ -61,6 +61,16 @@ func (s *OrderService) worker(id int) {
 }
 
 func (s *OrderService) processOrderInDB(payload OrderPayload) {
+/* // TODO: [LIVE-CODING-DANG-5] - Panic Recovery (Chống sập Server)
+defer func() {
+    if r := recover(); r != nil {
+        log.Printf("CẢNH BÁO: Worker bắt được Panic: %v. Bỏ qua đơn hàng lỗi, hệ thống tiếp tục chạy!", r)
+        for _, item := range payload.Items {
+            _ = s.cacheRepo.RollbackStock(context.Background(), item.TicketTypeID, item.Quantity)
+        }
+    }
+}()
+*/
 	ctx := context.Background()
 
 	// Tính tổng tiền (tái tạo lại cho Entity Order)
@@ -82,6 +92,15 @@ func (s *OrderService) processOrderInDB(payload OrderPayload) {
 
 	// Gọi hàm lưu Order có Transaction
 	err := s.repo.CreateOrderWithTransaction(ctx, order, payload.Items)
+/* // TODO: [LIVE-CODING-DANG-2] - Bù trừ (Compensation) khi Worker ghi DB thất bại
+if err != nil {
+    log.Printf("CẢNH BÁO: Ghi DB thất bại cho Order %v. Đang hoàn lại vé lên Redis...", payload.OrderID)
+    // Gọi hàm hoàn vé của Redis tại đây (điều chỉnh tên hàm cho đúng)
+    for _, item := range payload.Items {
+        _ = s.cacheRepo.RollbackStock(ctx, item.TicketTypeID, item.Quantity)
+    }
+}
+*/
 	if err != nil {
 		log.Printf("lưu đơn hàng %s vào DB: %v", payload.OrderID, err)
 		// Hoàn lại vé vào Redis
@@ -148,6 +167,18 @@ func (s *OrderService) PlaceOrder(ctx context.Context, userID uuid.UUID, items [
 	// 3. Đẩy vào Job Queue
 	select {
 	case s.orderQueue <- payload:
+/* // TODO: [LIVE-CODING-DANG-1] - Xử lý quá tải Channel
+select {
+case s.orderQueue <- payload:
+    // Kênh còn chỗ, tiếp tục bình thường
+    // return nil (hoặc logic thành công hiện tại)
+default:
+    // Kênh ĐẦY. User bị từ chối.
+    // Log cảnh báo
+    // Bù trừ Redis: Gọi hàm hoàn lại vé trên Redis ở đây (nếu có)
+    return errors.New("hệ thống đang quá tải, vui lòng thử lại sau")
+}
+*/
 		// Queue nhận job thành công
 	default:
 		// Hàng đợi đầy -> Quá tải hệ thống -> Rollback Redis

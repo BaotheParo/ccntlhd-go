@@ -1,0 +1,108 @@
+### 🚀 1. LỆNH GOLANG CƠ BẢN (Chạy & Tải thư viện)
+*Nhớ đứng ở thư mục gốc của project trước khi gõ lệnh.*
+
+* **Chạy Server trực tiếp (Không dùng Docker):**
+  ```bash
+  go run cmd/server/main.go
+  ```
+* **Tải và dọn dẹp thư viện (Dependency):** *(Dùng khi AI nhắc bạn thêm thư viện mới hoặc file báo lỗi đỏ)*
+  ```bash
+  go mod tidy
+  ```
+* **Build ra file thực thi (Đóng gói):**
+  ```bash
+  go build -o server cmd/server/main.go
+  ```
+
+---
+
+### 🧪 2. LỆNH KIỂM THỬ (TESTING & LOAD TEST)
+*Thầy rất thích sinh viên biết chạy Test.*
+
+* **Chạy TOÀN BỘ các file Test (Kèm chi tiết -v):**
+  ```bash
+  go test -v ./...
+  ```
+* **Chạy riêng thư mục Integration Test:**
+  ```bash
+  go test -v ./tests/integration/...
+  ```
+* **Chạy duy nhất 1 hàm Test cụ thể:** *(VD: Test hàm Order)*
+  ```bash
+  go test -v -run TestPlaceOrder ./tests/integration/
+  ```
+* **Chạy Load Test bằng k6:** *(Mô phỏng Flash Sale tải cao)*
+  ```bash
+  k6 run tests/load/flash_sale_test.js
+  ```
+
+---
+
+### 🐳 3. LỆNH DOCKER & DOCKER COMPOSE
+*Quản lý toàn bộ hạ tầng chỉ bằng vài dòng lệnh.*
+
+* **Khởi động toàn bộ hệ thống (App, Postgres, Redis) chạy ngầm:**
+  ```bash
+  docker-compose up -d
+  ```
+* **Build lại hệ thống và khởi động:** *(DÙNG LỆNH NÀY nếu bạn vừa sửa code Golang)*
+  ```bash
+  docker-compose up --build
+  ```
+* **Xem Log trực tiếp của hệ thống (Rất quan trọng để debug):**
+  ```bash
+  docker-compose logs -f
+  ```
+  *(Để xem log riêng của Web Server Go: `docker-compose logs -f app`)*
+* **Tắt và dọn dẹp hệ thống:**
+  ```bash
+  docker-compose down
+  ```
+* **Xóa sạch toàn bộ Data (Volumes) của Database & Redis (Reset làm lại từ đầu):**
+  ```bash
+  docker-compose down -v
+  ```
+
+---
+
+### 🗄️ 4. LỆNH THAO TÁC CƠ SỞ DỮ LIỆU NHANH (REDIS)
+*Nếu thầy bắt chứng minh vé trên Redis có bị trừ hay hoàn lại không, hãy dùng các lệnh này.*
+
+* **Truy cập vào giao diện dòng lệnh của Redis (Redis CLI):**
+  ```bash
+  docker exec -it redis redis-cli
+  ```
+* *(Khi đã ở trong Redis CLI)* **Xem số lượng vé hiện tại của Event 1:**
+  ```bash
+  GET ticket_stock:event_1
+  ```
+* *(Khi đã ở trong Redis CLI)* **Tự set lại số lượng vé thành 100:**
+  ```bash
+  SET ticket_stock:event_1 100
+  ```
+* *(Khi đã ở trong Redis CLI)* **Xóa sạch toàn bộ RAM của Redis:**
+  ```bash
+  FLUSHALL
+  ```
+  *(Gõ `exit` để thoát khỏi Redis CLI)*
+
+---
+
+### 📖 5. LỆNH CẬP NHẬT TÀI LIỆU SWAGGER
+*Nếu bạn vừa sửa API, sửa Router và muốn cập nhật lại giao diện Swagger Docs (phần của Điền).*
+
+* **Tự động sinh lại file Docs:**
+  ```bash
+  swag init -g cmd/server/main.go
+  ```
+
+---
+
+### 🆘 6. XỬ LÝ SỰ CỐ NHANH (TROUBLESHOOTING)
+
+* **Lỗi: "Port is already allocated" (Cổng 8080 hoặc 5432 đã bị chiếm):**
+  *Giải pháp:* Thường do bạn đang chạy trùng 1 lúc cả `go run` và `docker-compose`. Hãy tắt 1 cái đi. Hoặc kiểm tra xem có ứng dụng Postgres nào đang chạy ngầm trên máy ảo không.
+* **Lỗi: "command not found: k6" hoặc "swag":**
+  *Giải pháp:* Đảm bảo bạn đã cài đặt các công cụ này và đưa đường dẫn vào môi trường (Environment Variables). 
+
+**Mẹo phòng thi:** Hãy lưu toàn bộ nội dung này vào file `commands.txt` và để ngay Desktop. Bất cứ khi nào bí lệnh, nhấn `Ctrl + F` gõ từ khóa (ví dụ: `test`, `docker`) là bạn sẽ lấy ra được lệnh chuẩn xác nhất! Bạn còn cần bổ sung lệnh nào đặc thù mà nhóm hay dùng nữa không?

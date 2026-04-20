@@ -1,0 +1,29 @@
+=== DRAFT SOLUTION ===
+
+[VỊ TRÍ CẦN SỬA]
+- Tên file: File chứa hàm processBooking
+- Vị trí: Thay thế toàn bộ khối lệnh cập nhật dưới "// --- ĐOẠN CODE CẦN SỬA ---"
+
+[CODE CỐT LÕI]
+```go
+// Dùng Atomic Update để khóa ngay tại row của CSDL trong lúc tính toán trừ vé.
+// Điều kiện quantity > 0 đảm bảo không bao giờ trừ quá số vé đang có.
+err := tx.Model(&Ticket{}).
+	Where("event_id = ? AND quantity > 0", eventID).
+	Update("quantity", gorm.Expr("quantity - ?", 1)).Error
+
+if err != nil {
+	return err // Tự động defer rollback nhờ cơ chế db.Transaction
+}
+
+// RowsAffected == 0 tức là điều kiện update thất bại (không còn vé > 0)
+// Worker hiện tại không trừ được vé nào nên sẽ báo lỗi Hết vé.
+if tx.RowsAffected == 0 {
+	return fmt.Errorf("hết vé (Overselling prevented)")
+}
+```
+
+[GIẢI THÍCH ĐỂ VẤN ĐÁP]
+- Mục đích đoạnh code là áp dụng Atomic Update (`gorm.Expr`) để nhường lại việc tính toán `quantity - 1` cho tầng DB thay vì code Go, tránh ghi đè dữ liệu cũ (Race Condition).
+- Nó giải quyết được bài toán bằng cách yêu cầu DB khoá row kết hợp điều kiện `quantity > 0` và check `RowsAffected == 0`, đảm bảo Worker nào chậm chân sẽ bị DB từ chối.
+- Cách kiểm chứng: Bắn K6/JMeter chục nghìn request cùng lúc (hoặc script vòng lặp), sau đó kiểm tra Database sẽ thấy `quantity` dừng lại đúng số 0, không bao giờ bị âm.

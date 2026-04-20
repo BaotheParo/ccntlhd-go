@@ -162,6 +162,35 @@ func main() {
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 
+/* // TODO: [LIVE-CODING-DANG-4] - Graceful Shutdown (Tắt máy an toàn)
+// Lưu ý: Cần đảm bảo wg.Add(1) và defer wg.Done() đã được đặt trong hàm chạy Worker
+
+<-quit // Nhận tín hiệu tắt máy (Ctrl+C)
+fmt.Println("Đang tiến hành Graceful Shutdown...")
+
+// 1. Đóng channel để ngừng nhận đơn mới
+close(orderQueue) 
+
+// 2. Setup Context Timeout (Cưỡng chế tắt sau 30s nếu Worker bị treo)
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+doneChan := make(chan struct{})
+
+// 3. Chờ các Worker làm nốt việc trong background
+go func() {
+    wg.Wait()
+    close(doneChan)
+}()
+
+// 4. Đua (Race) giữa việc làm xong và hết thời gian 30s
+select {
+case <-doneChan:
+    fmt.Println("Tất cả Worker đã xử lý xong. Server tắt an toàn.")
+case <-ctx.Done():
+    fmt.Println("CẢNH BÁO: Hết 30s! Cưỡng chế tắt Server.")
+}
+*/
+
 	log.Println("\nNhận tín hiệu dừng server, rục rịch tắt hệ thống...")
 
 	// Dừng Fiber từ chối request mới

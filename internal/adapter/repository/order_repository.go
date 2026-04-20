@@ -40,6 +40,19 @@ func (r *orderRepository) CreateOrderWithTransaction(ctx context.Context, order 
 			if result.RowsAffected == 0 {
 				return errors.New("không đủ số lượng vé trong database")
 			}
+/* // TODO: [LIVE-CODING-DANG-3] - Chống Race Condition bằng Atomic Update GORM
+// Dùng Optimistic Update để trừ vé trực tiếp dưới DB thay vì đem lên RAM tính toán
+result := tx.Model(&entity.TicketType{}).
+    Where("id = ? AND remaining_quantity >= ?", item.TicketTypeID, item.Quantity).
+    Update("remaining_quantity", gorm.Expr("remaining_quantity - ?", item.Quantity))
+
+if result.Error != nil {
+    return result.Error
+}
+if result.RowsAffected == 0 {
+    return errors.New("hết vé: Race Condition đã bị chặn ở tầng DB")
+}
+*/
 		}
 
 		return nil
@@ -105,6 +118,22 @@ func (r *orderRepository) ListOrdersAdvanced(ctx context.Context, page, limit in
 		Offset(offset).
 		Order("orders.created_at DESC").
 		Find(&orders).Error
+
+/* // TODO: [LIVE-CODING-DANG-6] - Tối ưu N+1 Query (Eager Loading)
+// Giải pháp: Bỏ vòng lặp for ở trên, dùng Preload để gộp query.
+// Thêm .Debug() để in câu SQL ra Terminal chứng minh với thầy.
+err = query.Debug().
+    Preload("Items"). // Thay "Items" bằng tên trường liên kết (association) trong Struct
+    // Preload("User"). // Bật lên nếu muốn lấy thêm dữ liệu User
+    Limit(limit).
+    Offset(offset).
+    Order("orders.created_at DESC").
+    Find(&orders).Error
+
+if err != nil {
+    return nil, 0, err
+}
+*/
 
 	return orders, total, err
 }
