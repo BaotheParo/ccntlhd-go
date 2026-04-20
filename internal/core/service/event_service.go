@@ -332,3 +332,7 @@ func (s *eventService) UpdateTicketType(ctx context.Context, ticketID uuid.UUID,
 
 	return ticketType, nil
 }
+
+func (s *eventService) GetAllTicketTypeByIDEvent(ctx context.Context, id uuid.UUID) ([]entity.TicketType, error) {
+	return s.eventRepo.GetAllTicketTypeByIDEvent(ctx, id)
+}

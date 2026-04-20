@@ -31,99 +31,66 @@ import (
 // @host localhost:8080
 // @BasePath /api/v1
 func main() {
-	// 1. Tải cấu hình trước khi làm bất kỳ việc gì
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Không thể tải cấu hình: %v", err)
+		log.Fatalf("Khong the tai cau hinh: %v", err)
 	}
 
 	jwtSecret := getEnv("JWT_SECRET", "my-super-secret-key-2026")
-	
-	// Sử dụng biến môi trường (ưu tiên cho Docker), nếu không có thì dùng config.yaml
+
 	dbHost := getEnv("DB_HOST", cfg.Database.Host)
 	dbPort := getEnv("DB_PORT", fmt.Sprintf("%d", cfg.Database.Port))
-	
+	dbUser := getEnv("DB_USER", cfg.Database.User)
+	dbPass := getEnv("DB_PASS", cfg.Database.Password)
+	dbName := getEnv("DB_NAME", cfg.Database.DBName)
+
 	if dbHost == "" {
 		dbHost = "localhost"
 	}
-	// Nếu chạy docker, port nội bộ là 5432. Nếu chạy local, thường là 5433
 	if dbPort == "0" || dbPort == "" {
 		dbPort = "5433"
 	}
 
-	// Cập nhật lại Redis Addr từ môi trường nếu có
 	redisAddr := getEnv("REDIS_ADDR", cfg.Redis.Addr)
 	if redisAddr == "" {
 		redisAddr = "localhost:6380"
 	}
 	cfg.Redis.Addr = redisAddr
 
-	dbConnStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		dbHost,
-		dbPort,
-		cfg.Database.User,
-		cfg.Database.Password,
-		cfg.Database.DBName,
-	)
-
-	// 2. Kết nối Database với GORM
-	var db *gorm.DB
-
-	// Chờ DB sẵn sàng (Retry logic)
-	for i := 0; i < 5; i++ {
-		db, err = gorm.Open(postgres.Open(dbConnStr), &gorm.Config{
-			Logger: gormlogger.Default.LogMode(gormlogger.Info),
-		})
-		if err == nil {
-			break
-		}
-		log.Printf("Đang đợi DB... (%d/5) - Connect String: %s", i+1, dbConnStr)
-		time.Sleep(2 * time.Second)
-	}
+	dbTargets := buildDBTargets(dbHost, dbPort, fmt.Sprintf("%d", cfg.Database.Port))
+	db, err := connectDatabase(dbTargets, dbUser, dbPass, dbName)
 	if err != nil {
-		log.Fatalf("Không thể kết nối Database: %v", err)
+		log.Fatalf("Khong the ket noi Database: %v", err)
 	}
-	log.Println("✅ Connected to Database successfully!")
+	log.Println("Connected to Database successfully")
 
-	// Tự động Migrate cấu trúc Database
 	if err := db.AutoMigrate(&entity.User{}, &entity.Event{}, &entity.TicketType{}, &entity.Order{}, &entity.OrderItem{}); err != nil {
-		log.Printf("⚠️ Lỗi Migrate Database: %v", err)
+		log.Printf("Loi migrate Database: %v", err)
 	} else {
-		log.Println("✅ AutoMigrate Database successfully!")
+		log.Println("AutoMigrate Database successfully")
 	}
 
-	// 3. Khởi tạo các lớp (Dependency Injection)
-	// Thứ tự: DB -> Repository -> Service -> Handler
-
-	// Khởi tạo redisClient sớm để dùng cho TicketCacheRepo
 	redisClient := redis_client.NewRedisClient(cfg)
 	ticketCacheRepo := repository.NewRedisTicketRepository(redisClient)
 
-	// User module
 	userRepo := repository.NewUserRepository(db)
 	authService := service.NewAuthService(userRepo, jwtSecret)
 	authHandler := handler.NewAuthHandler(authService)
 
-	// Event module
 	eventRepo := repository.NewEventRepository(db)
 	eventService := service.NewEventService(eventRepo, ticketCacheRepo)
 	eventHandler := handler.NewEventHandler(eventService)
 
-	// Statistics module
 	statisticsRepo := repository.NewStatisticRepository(db)
 	statisticsService := service.NewStatisticsService(statisticsRepo)
 	statisticsHandler := handler.NewStatisticsHandler(statisticsService)
 
-	// Order module
 	orderRepo := repository.NewOrderRepository(db)
-
-	// Khởi tạo Worker Pool parameters
 	queueSize := 10000
 	numWorkers := 50
 	orderService := service.NewOrderService(orderRepo, eventRepo, ticketCacheRepo, queueSize, numWorkers)
 	orderHandler := handler.NewOrderHandler(orderService)
 
-	// 4. Khởi tạo Fiber
 	app := fiber.New(fiber.Config{
 		AppName: "Ticketing System v1",
 	})
@@ -132,78 +99,45 @@ func main() {
 		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
-
-	// Middleware ghi log để bạn theo dõi trên Terminal khi Postman gọi tới
 	app.Use(logger.New())
 
-	// 5. GỌI ROUTER Ở ĐÂY
 	handler.SetupRoutes(app, userRepo, authHandler, eventHandler, orderHandler, statisticsHandler, jwtSecret)
 
-	// 6. Chạy Server và cấu hình Graceful Shutdown
 	port := cfg.Server.Port
 	if port == "" {
 		port = ":8080"
 	}
-	// Nếu port chỉ có số (như 8081) thì thêm dấu : vào trước
 	if !strings.HasPrefix(port, ":") {
 		port = ":" + port
 	}
 
-	// Khởi chạy server trong một goroutine
 	go func() {
 		log.Printf("Starting server on port %s", port)
 		if err := app.Listen(port); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Lỗi server: %v", err)
+			log.Fatalf("Loi server: %v", err)
 		}
 	}()
 
-	// Chờ tín hiệu từ OS (SIGTERM, SIGINT) để thực hiện Graceful Shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 
-/* // TODO: [LIVE-CODING-DANG-4] - Graceful Shutdown (Tắt máy an toàn)
-// Lưu ý: Cần đảm bảo wg.Add(1) và defer wg.Done() đã được đặt trong hàm chạy Worker
+	log.Println("Nhan tin hieu dung server, dang tat he thong...")
 
-<-quit // Nhận tín hiệu tắt máy (Ctrl+C)
-fmt.Println("Đang tiến hành Graceful Shutdown...")
-
-// 1. Đóng channel để ngừng nhận đơn mới
-close(orderQueue) 
-
-// 2. Setup Context Timeout (Cưỡng chế tắt sau 30s nếu Worker bị treo)
-ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-defer cancel()
-doneChan := make(chan struct{})
-
-// 3. Chờ các Worker làm nốt việc trong background
-go func() {
-    wg.Wait()
-    close(doneChan)
-}()
-
-// 4. Đua (Race) giữa việc làm xong và hết thời gian 30s
-select {
-case <-doneChan:
-    fmt.Println("Tất cả Worker đã xử lý xong. Server tắt an toàn.")
-case <-ctx.Done():
-    fmt.Println("CẢNH BÁO: Hết 30s! Cưỡng chế tắt Server.")
-}
-*/
-
-	log.Println("\nNhận tín hiệu dừng server, rục rịch tắt hệ thống...")
-
-	// Dừng Fiber từ chối request mới
 	if err := app.Shutdown(); err != nil {
-		log.Fatalf("Fiber Shutdown bị lỗi: %v", err)
+		log.Fatalf("Fiber Shutdown bi loi: %v", err)
 	}
 
-	// Chờ Worker Pool xử lý nốt đơn hàng đang tồn đọng
 	if err := orderService.Shutdown(); err != nil {
-		log.Fatalf("OrderService Shutdown bị lỗi: %v", err)
+		log.Fatalf("OrderService Shutdown bi loi: %v", err)
 	}
 
-	log.Println("Hệ thống đã tắt an toàn!")
+	log.Println("He thong da tat an toan")
+}
+
+type dbTarget struct {
+	Host string
+	Port string
 }
 
 func getEnv(key, fallback string) string {
@@ -211,4 +145,74 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func buildDBTargets(primaryHost string, primaryPort string, configPort string) []dbTarget {
+	targets := []dbTarget{
+		{Host: primaryHost, Port: primaryPort},
+	}
+
+	if primaryHost == "postgres" {
+		targets = appendUniqueDBTarget(targets, dbTarget{Host: "localhost", Port: configPort})
+		targets = appendUniqueDBTarget(targets, dbTarget{Host: "127.0.0.1", Port: configPort})
+	}
+
+	return targets
+}
+
+func appendUniqueDBTarget(targets []dbTarget, candidate dbTarget) []dbTarget {
+	for _, target := range targets {
+		if target.Host == candidate.Host && target.Port == candidate.Port {
+			return targets
+		}
+	}
+
+	return append(targets, candidate)
+}
+
+func connectDatabase(targets []dbTarget, user string, password string, dbName string) (*gorm.DB, error) {
+	var lastErr error
+
+	for i, target := range targets {
+		connStr := fmt.Sprintf(
+			"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+			target.Host,
+			target.Port,
+			user,
+			password,
+			dbName,
+		)
+		log.Printf("Trying DB connection via %s:%s (%d/%d)", target.Host, target.Port, i+1, len(targets))
+
+		db, err := openDBWithRetry(connStr, 5)
+		if err == nil {
+			return db, nil
+		}
+
+		lastErr = err
+		log.Printf("DB connection via %s:%s failed: %v", target.Host, target.Port, err)
+	}
+
+	return nil, lastErr
+}
+
+func openDBWithRetry(connStr string, attempts int) (*gorm.DB, error) {
+	var (
+		db  *gorm.DB
+		err error
+	)
+
+	for i := 0; i < attempts; i++ {
+		db, err = gorm.Open(postgres.Open(connStr), &gorm.Config{
+			Logger: gormlogger.Default.LogMode(gormlogger.Info),
+		})
+		if err == nil {
+			return db, nil
+		}
+
+		log.Printf("Dang doi DB... (%d/%d) - Connect String: %s", i+1, attempts, connStr)
+		time.Sleep(2 * time.Second)
+	}
+
+	return nil, err
 }

@@ -318,3 +318,23 @@ func (h *EventHandler) UpdateTicketType(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(ticketType)
 }
 
+func (h *EventHandler) GetTicketTypeByIDEvent(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	// Parse UUID
+	eventID, err := uuid.Parse(id)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "ID không hợp lệ",
+		})
+	}
+
+	ticketTypes, err := h.svc.GetAllTicketTypeByIDEvent(c.Context(), eventID)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Không tìm thấy vé của sự kiện này",
+		})
+	}
+
+	return c.JSON(ticketTypes)
+}
